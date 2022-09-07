@@ -170,7 +170,7 @@ void DefaultStorageStage::handle_event(StageEvent *event)
     } break;
     case SCF_DROP_TABLE: {
       const DropTable& drop_table = sql->sstr.drop_table; // 拿到要drop的表
-      rc = handler_->drop_table(db->name(),drop_table.relation_name); // 调用drop table接口，drop table要在handler中实现
+      rc = handler_->drop_table(dbname,drop_table.relation_name); // 调用drop table接口，drop table要在handler中实现
       snprintf(response,sizeof(response),"%s\n", rc == RC::SUCCESS ? "SUCCESS" : "FAILURE"); // 返回结果，带不带换行符都可以
     } break;
     default:
