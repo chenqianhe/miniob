@@ -106,12 +106,17 @@ public:
   {
     return pin_count_ <= 0;
   }
+  unsigned int get_visit_count()
+  {
+    return visit_count_;
+  }
 private:
   friend class DiskBufferPool;
 
   bool          dirty_     = false;
   unsigned int  pin_count_ = 0;
   unsigned long acc_time_  = 0;
+  unsigned int visit_count_ = 0; // 访问次数
   int           file_desc_ = -1;
   Page          page_;
 };

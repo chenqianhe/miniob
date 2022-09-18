@@ -40,9 +40,34 @@ static bool match_purge(void *item, void *arg)
   return frame->can_purge();
 }
 
+static bool get_all_frame(void *item, void *arg)
+{
+  return true;
+}
+
 Frame *BPFrameManager::begin_purge()
 {
-  return MemPoolSimple<Frame>::find(match_purge, nullptr);
+  /**
+   * 获取所有满足条件的可替换的 frame
+   */
+  std::list<Frame *> all_purge = MemPoolSimple<Frame>::find_all(match_purge, nullptr);
+  if (all_purge.empty()) {
+    return nullptr;
+  } else {
+    Frame * purge_frame = all_purge.front();
+    for (auto frame : all_purge)
+    {
+      if (frame->get_visit_count() < purge_frame->get_visit_count()) {
+        purge_frame = frame;
+      }
+    }
+    /**
+     * 更新 visit_count
+     */
+    std::list<Frame *> all_frame = MemPoolSimple<Frame>::find_all(get_all_frame, nullptr);
+    return purge_frame;
+  }
+//  return MemPoolSimple<Frame>::find(match_purge, nullptr);
 }
 
 struct MatchFilePage {
@@ -161,6 +186,10 @@ RC DiskBufferPool::open_file(const char *file_name)
   hdr_frame_->file_desc_ = fd;
   hdr_frame_->pin_count_ = 1;
   hdr_frame_->acc_time_ = current_time();
+  /**
+   * 不管成不成功，都访问了一次
+   */
+  hdr_frame_->visit_count_ ++;
   if ((rc = load_page(BP_HEADER_PAGE, hdr_frame_)) != RC::SUCCESS) {
     LOG_ERROR("Failed to load first page of %s, due to %s.", file_name, strerror(errno));
     hdr_frame_->pin_count_ = 0;
@@ -183,6 +212,10 @@ RC DiskBufferPool::close_file()
     return rc;
   }
 
+  /**
+   * 访问一次
+   */
+  hdr_frame_->visit_count_ ++;
   hdr_frame_->pin_count_--;
   if ((rc = purge_all_pages()) != RC::SUCCESS) {
     hdr_frame_->pin_count_++;
@@ -210,6 +243,10 @@ RC DiskBufferPool::get_this_page(PageNum page_num, Frame **frame)
   Frame *used_match_frame = frame_manager_.get(file_desc_, page_num);
   if (used_match_frame != nullptr) {
     used_match_frame->pin_count_++;
+    /**
+     * 访问一次
+     */
+    used_match_frame->visit_count_ ++ ;
     used_match_frame->acc_time_ = current_time();
 
     frame_manager_.mark_modified(used_match_frame);
@@ -228,6 +265,10 @@ RC DiskBufferPool::get_this_page(PageNum page_num, Frame **frame)
   allocated_frame->dirty_ = false;
   allocated_frame->file_desc_ = file_desc_;
   allocated_frame->pin_count_ = 1;
+  /**
+   * 访问一次
+   */
+   allocated_frame->visit_count_ ++;
   allocated_frame->acc_time_ = current_time();
   if ((rc = load_page(page_num, allocated_frame)) != RC::SUCCESS) {
     LOG_ERROR("Failed to load page %s:%d", file_name_.c_str(), page_num);
@@ -278,6 +319,9 @@ RC DiskBufferPool::allocate_page(Frame **frame)
   allocated_frame->dirty_ = false;
   allocated_frame->file_desc_ = file_desc_;
   allocated_frame->pin_count_ = 1;
+  /**
+   * 访问一次
+   */
   allocated_frame->acc_time_ = current_time();
   allocated_frame->clear_page();
   allocated_frame->page_.page_num = file_header_->page_count - 1;

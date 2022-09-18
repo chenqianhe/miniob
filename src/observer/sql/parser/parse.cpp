@@ -195,7 +195,8 @@ void updates_init(Updates *updates, const char *relation_name, const char *attri
 {
   updates->relation_name = strdup(relation_name);
   updates->attribute_name = strdup(attribute_name);
-  updates->value = *value;
+  // todo: 修改
+  updates->value = value;
 
   assert(condition_num <= sizeof(updates->conditions) / sizeof(updates->conditions[0]));
   for (size_t i = 0; i < condition_num; i++) {
@@ -211,7 +212,8 @@ void updates_destroy(Updates *updates)
   updates->relation_name = nullptr;
   updates->attribute_name = nullptr;
 
-  value_destroy(&updates->value);
+  // todo: 修改
+//  value_destroy(&updates->value);
 
   for (size_t i = 0; i < updates->condition_num; i++) {
     condition_destroy(&updates->conditions[i]);
