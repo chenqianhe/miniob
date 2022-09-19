@@ -45,7 +45,8 @@ typedef enum
   UNDEFINED,
   CHARS,
   INTS,
-  FLOATS
+  FLOATS,
+  DATES
 } AttrType;
 
 //属性值
@@ -80,7 +81,7 @@ typedef struct {
 typedef struct {
   char *relation_name;    // Relation to insert into
   size_t value_num;       // Length of values
-  Value values[MAX_NUM];  // values to insert
+  Value *values;  // values to insert
 } Inserts;
 
 // struct of delete
@@ -189,6 +190,8 @@ void relation_attr_destroy(RelAttr *relation_attr);
 void value_init_integer(Value *value, int v);
 void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
+void value_init_date(Value *value, const char *v);
+void long_value_init_date(Value *value, long v);
 void value_destroy(Value *value);
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
