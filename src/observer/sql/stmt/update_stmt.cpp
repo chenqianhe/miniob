@@ -19,8 +19,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/table.h"
 #include "sql/stmt/filter_stmt.h"
 
-UpdateStmt::UpdateStmt(Table *table, const Value *value, FilterStmt *filter_stmt)
-  : table_(table), value_(value), filter_stmt_(filter_stmt)
+UpdateStmt::UpdateStmt(Table *table, const char *attribute_name,const Value *value, FilterStmt *filter_stmt)
+  : table_(table), attributre_name_(attribute_name), value_(value), filter_stmt_(filter_stmt)
 {}
 UpdateStmt::~UpdateStmt()
 {
@@ -64,6 +64,6 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
     return rc;
   }
 
-  stmt = new UpdateStmt(table,value,filter_stmt);
+  stmt = new UpdateStmt(table,attribute_name,value,filter_stmt);
   return rc;
 }

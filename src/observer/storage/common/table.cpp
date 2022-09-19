@@ -650,6 +650,47 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
 {
   return RC::GENERIC_ERROR;
 }
+RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value, Record *record)
+{
+  //删除原有record
+  RC rc = RC::SUCCESS;
+  rc = delete_record(nullptr,record);
+  //修改record
+  const FieldMeta *field = table_meta_.field(*attribute_name);
+  switch (field->type()) {
+    case INTS: {
+      if (value->type != INTS) {
+        LOG_ERROR("Field type is not matching");
+      }
+      *(int *)(record->data() + field->offset()) = *(int *)value->data;
+    }
+      break;
+    case CHARS:{
+      if(value->type != CHARS){
+        LOG_ERROR("Field type is not matching");
+      }
+      *(char *)(record->data() + field->offset()) = *(char *)value->data;
+    }
+      break;
+    case FLOATS:{
+      if(value->type != FLOATS){
+        LOG_ERROR("Field type is not matching");
+      }
+      *(float *)(record->data() + field->offset()) = *(float *)value->data;
+    }
+      break;
+//    case DATES:{
+//      if(value->type != DATES){
+//        LOG_ERROR("Field type is not matching");
+//      }
+//      *(Date *)(record->data() + field->offset()) = *(Date *)value->data;
+//    }
+    default:
+      break;
+  }
+  rc = insert_record(nullptr,record);
+  return rc;
+}
 
 class RecordDeleter {
 public:

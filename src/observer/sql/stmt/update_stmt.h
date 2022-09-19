@@ -26,7 +26,7 @@ class UpdateStmt : public Stmt
 public:
 
   UpdateStmt() = default;
-  UpdateStmt(Table *table, const Value *value, FilterStmt *filterStmt);
+  UpdateStmt(Table *table,const char *attribute_name, const Value *value, FilterStmt *filterStmt);
   ~UpdateStmt() override;
 
   StmtType type() const override {
@@ -38,10 +38,12 @@ public:
 
 public:
   Table *table() const {return table_;}
+  const char *attribute_name() const {return attribute_name_;};
   const Value *value() const { return value_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
 private:
   Table *table_ = nullptr;
+  const char *attributre_name_ = nullptr;
   const Value *value_ = nullptr;
   FilterStmt *filter_stmt_ = nullptr;
 };
