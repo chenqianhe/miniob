@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/filter_stmt.h"
 
 UpdateStmt::UpdateStmt(Table *table, const char *attribute_name,const Value *value, FilterStmt *filter_stmt)
-  : table_(table), attributre_name_(attribute_name), value_(value), filter_stmt_(filter_stmt)
+  : table_(table), attribute_name_(attribute_name), value_(value), filter_stmt_(filter_stmt)
 {}
 UpdateStmt::~UpdateStmt()
 {

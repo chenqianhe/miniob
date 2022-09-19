@@ -43,7 +43,7 @@ public:
   FilterStmt *filter_stmt() const { return filter_stmt_; }
 private:
   Table *table_ = nullptr;
-  const char *attributre_name_ = nullptr;
+  const char *attribute_name_ = nullptr;
   const Value *value_ = nullptr;
   FilterStmt *filter_stmt_ = nullptr;
 };
