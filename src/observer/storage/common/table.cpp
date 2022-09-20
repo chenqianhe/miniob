@@ -652,43 +652,64 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
 }
 RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value, Record *record)
 {
-  //删除原有record
+
   RC rc = RC::SUCCESS;
+  Record new_record;
+  const FieldMeta *field = table_meta_.field(attribute_name);
+  char *new_record_data = new char[table_meta_.record_size()];
+  memcpy(new_record_data,record->data(),table_meta_.record_size());
+  LOG_INFO("new record data has copied");
+    //  删除原有record
+  LOG_INFO("try to delete old record");
   rc = delete_record(nullptr,record);
-  //修改record
-  const FieldMeta *field = table_meta_.field(*attribute_name);
+  LOG_INFO("finished delete old record");
+    //  修改record
+  size_t copy_len = field->len();
   switch (field->type()) {
     case INTS: {
       if (value->type != INTS) {
         LOG_ERROR("Field type is not matching");
       }
-      *(int *)(record->data() + field->offset()) = *(int *)value->data;
+
+      memcpy(new_record_data+ field->offset(), value->data, copy_len);
+
     }
       break;
     case CHARS:{
       if(value->type != CHARS){
         LOG_ERROR("Field type is not matching");
       }
-      *(char *)(record->data() + field->offset()) = *(char *)value->data;
+
+      const size_t data_len = strlen((const char *)value->data);
+      if (copy_len > data_len) {
+        copy_len = data_len + 1;
+      }
+      memcpy(new_record_data + field->offset(), value->data, copy_len);
+
     }
       break;
     case FLOATS:{
       if(value->type != FLOATS){
         LOG_ERROR("Field type is not matching");
       }
-      *(float *)(record->data() + field->offset()) = *(float *)value->data;
+
+      memcpy(new_record_data + field->offset(), value->data, copy_len);
+
     }
       break;
 //    case DATES:{
 //      if(value->type != DATES){
 //        LOG_ERROR("Field type is not matching");
 //      }
-//      *(Date *)(record->data() + field->offset()) = *(Date *)value->data;
+//
+//      memcpy(new_record_data + field->offset(), value->data, copy_len);
 //    }
     default:
       break;
   }
-  rc = insert_record(nullptr,record);
+  new_record.set_data(new_record_data);
+  rc = insert_record(trx,&new_record);
+  delete [] new_record_data;
   return rc;
 }
 
