@@ -32,7 +32,38 @@ RC string_to_date(const char* str, long &date) {
   return RC::SUCCESS;
 }
 
-void init_conditions_date(Condition *conditions)
+RC init_conditions_date(Condition conditions[], int condition_num)
 {
-
+  RC rc = RC::SUCCESS;
+  for (int i = 0; i < condition_num; i++) {
+    /**
+     * 左值 date 转化
+     */
+    if (!conditions[i].left_is_attr) {
+      if (conditions[i].left_value.type == DATES) {
+        long date = -1;
+        rc = string_to_date((char *)conditions[i].left_value.data, date);
+        if (rc != RC::SUCCESS) {
+          return rc;
+        }
+        value_destroy(&conditions[i].left_value);
+        long_value_init_date(&conditions[i].left_value, date);
+      }
+    }
+    /**
+     * 右值 date 转化
+     */
+    if (!conditions[i].right_is_attr) {
+      if (conditions[i].right_value.type == DATES) {
+        long date = -1;
+        rc = string_to_date((char *)conditions[i].right_value.data, date);
+        if (rc != RC::SUCCESS) {
+          return rc;
+        }
+        value_destroy(&conditions[i].right_value);
+        long_value_init_date(&conditions[i].right_value, date);
+      }
+    }
+  }
+  return rc;
 }
