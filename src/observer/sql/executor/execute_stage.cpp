@@ -596,6 +596,10 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
   update_oper.add_child(&pred_oper);
 
   RC rc = update_oper.open();
+//  while((rc = update_oper.next())== RC::SUCCESS){
+//
+//  };
+
 
   if (rc == RC::SUCCESS) {
     session_event->set_response("SUCCESS\n");

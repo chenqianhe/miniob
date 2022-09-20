@@ -15,7 +15,7 @@ RC UpdateOperator::open()
 
   Operator *child = children_[0];
   RC rc = child->open();
-  LOG_INFO("Update operator opened");
+//  LOG_INFO("Update operator opened");
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open child operator: %s", strrc(rc));
     return rc;
@@ -24,7 +24,7 @@ RC UpdateOperator::open()
   Table *table = update_stmt_->table();
 
   while (RC::SUCCESS == (rc = child->next())) {
-    LOG_INFO("operating");
+//    LOG_INFO("operating");
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
       LOG_WARN("failed to get current record: %s", strrc(rc));
@@ -33,16 +33,17 @@ RC UpdateOperator::open()
 
     RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
     Record &record = row_tuple->record();
-    LOG_INFO("Update operator started");
-    LOG_INFO("func");
+//    LOG_INFO("Update operator started");
+//    LOG_INFO("func");
     rc = table->update_record(nullptr, update_stmt_->attribute_name(),update_stmt_->value(),&record);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
       return rc;
     }
     LOG_INFO("Update operator finished");
-    return RC::SUCCESS;
   }
+  return RC::SUCCESS;
+
 }
 
 RC UpdateOperator::next()
