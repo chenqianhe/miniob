@@ -9,6 +9,6 @@
 
 inline bool is_leap_year(int year);
 bool check_date(int y, int m, int d);
-RC string_to_date(const char* str, long &date);
+RC string_to_date(const char* str, int &date);
 RC init_conditions_date(Condition conditions[], int condition_num);
 #endif  // MINIDB_DATE_H

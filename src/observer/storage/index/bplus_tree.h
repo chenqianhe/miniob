@@ -43,9 +43,7 @@ public:
 
   int operator()(const char *v1, const char *v2) const {
     switch (attr_type_) {
-    case DATES: {
-      return (int)(*(long *)v1 - *(long *)v2);
-    } break;
+    case DATES:
     case INTS: {
       return *(int *)v1 - *(int *)v2;
     }

@@ -18,7 +18,7 @@ bool check_date(int y, int m, int d)
          && (d > 0)&&(d <= ((m==2 && leap)?1:0) + mon[m]);
 }
 
-RC string_to_date(const char* str, long &date) {
+RC string_to_date(const char* str, int &date) {
   int y,m,d;
   int ret = sscanf(str, "%d-%d-%d", &y, &m, &d);
   if (ret != 3) {
@@ -41,7 +41,7 @@ RC init_conditions_date(Condition conditions[], int condition_num)
      */
     if (!conditions[i].left_is_attr) {
       if (conditions[i].left_value.type == DATES) {
-        long date = -1;
+        int date = -1;
         rc = string_to_date((char *)conditions[i].left_value.data, date);
         if (rc != RC::SUCCESS) {
           return rc;
@@ -55,7 +55,7 @@ RC init_conditions_date(Condition conditions[], int condition_num)
      */
     if (!conditions[i].right_is_attr) {
       if (conditions[i].right_value.type == DATES) {
-        long date = -1;
+        int date = -1;
         rc = string_to_date((char *)conditions[i].right_value.data, date);
         if (rc != RC::SUCCESS) {
           return rc;

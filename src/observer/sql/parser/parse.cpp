@@ -68,11 +68,11 @@ void value_init_date(Value *value, const char *v)
     LOG_ERROR("DATE FORMAT ERROR");
     return;
   }
-  long dv = y*10000+m*100+d;
+  int dv = y*10000+m*100+d;
   value->data = malloc(sizeof(dv));
   memcpy(value->data, &dv, sizeof(dv));
 }
-void long_value_init_date(Value *value, long v)
+void long_value_init_date(Value *value, int v)
 {
   value->type = DATES;
   value->data = malloc(sizeof(v));
