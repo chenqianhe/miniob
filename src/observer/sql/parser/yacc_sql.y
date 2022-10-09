@@ -119,7 +119,7 @@ ParserContext *get_context(yyscan_t scanner)
 %token <string> ID
 %token <string> PATH
 %token <string> SSS
- %token <string> DATE_STR
+%token <string> DATE_STR
 %token <string> STAR
 %token <string> STRING_V
 //非终结符

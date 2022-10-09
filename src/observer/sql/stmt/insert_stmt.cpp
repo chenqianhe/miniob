@@ -22,7 +22,7 @@ InsertStmt::InsertStmt(Table *table, const Value *values, int value_amount)
   : table_ (table), values_(values), value_amount_(value_amount)
 {}
 
-RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
+RC InsertStmt::create(Db *db, Inserts &inserts, Stmt *&stmt)
 {
   const char *table_name = inserts.relation_name;
   if (nullptr == db || nullptr == table_name || inserts.value_num <= 0) {
@@ -39,7 +39,7 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
   }
 
   // check the fields number
-  const Value *values = inserts.values;
+  Value *values = inserts.values;
   const int value_num = inserts.value_num;
   const TableMeta &table_meta = table->table_meta();
   const int field_num = table_meta.field_num() - table_meta.sys_field_num();
@@ -55,6 +55,17 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
     const AttrType field_type = field_meta->type();
     const AttrType value_type = values[i].type;
     if (field_type != value_type) { // TODO try to convert the value type to field type
+      if (field_type == DATES) {
+        int date = -1;
+        RC rc = string_to_date((const char*)values[i].data, date);
+        if (rc != RC::SUCCESS) {
+          LOG_TRACE("DATE ERROR");
+          return rc;
+        }
+        value_destroy(&values[i]);
+        long_value_init_date(&values[i], date);
+        return RC::SUCCESS;
+      }
       LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d", 
                table_name, field_meta->name(), field_type, value_type);
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;

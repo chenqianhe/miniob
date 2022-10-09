@@ -65,6 +65,7 @@ RC Db::create_table(const char *table_name, int attribute_count, const AttrInfo 
   std::string table_file_path = table_meta_file(path_.c_str(), table_name);
   Table *table = new Table();
   rc = table->create(table_file_path.c_str(), table_name, path_.c_str(), attribute_count, attributes);
+  LOG_INFO("Create table state %d.", rc);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to create table %s.", table_name);
     delete table;

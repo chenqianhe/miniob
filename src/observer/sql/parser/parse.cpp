@@ -119,6 +119,7 @@ void condition_destroy(Condition *condition)
 
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length)
 {
+  LOG_INFO("init attr: %s", name);
   attr_info->name = strdup(name);
   attr_info->type = type;
   attr_info->length = length;
