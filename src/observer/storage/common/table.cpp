@@ -706,8 +706,9 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
       break;
     case DATES:{
       if(value->type != DATES){
-        LOG_ERROR("Field type is not matching");
-        return RC::SCHEMA_FIELD_MISSING;
+
+        LOG_ERROR("Field type is not matching , type = %d",value->type);
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
 
       memcpy(new_record_data + field->offset(), value->data, sizeof(int));
