@@ -10,9 +10,9 @@
 		},
 		{
 			"len" : 4,
-			"name" : "h",
+			"name" : "d1",
 			"offset" : 4,
-			"type" : "unknown",
+			"type" : "dates",
 			"visible" : true
 		}
 	],

@@ -22,7 +22,6 @@ See the Mulan PSL v2 for more details. */
 RC Stmt::create_stmt(Db *db, Query &query, Stmt *&stmt)
 {
   stmt = nullptr;
-
   switch (query.flag) {
   case SCF_INSERT: {
       return InsertStmt::create(db, query.sstr.insertion, stmt);

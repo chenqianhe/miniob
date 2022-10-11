@@ -704,15 +704,15 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
 
     }
       break;
-      //todo
-//    case DATES:{
-//      if(value->type != DATES){
-//        LOG_ERROR("Field type is not matching");
-//        return RC::SCHEMA_FIELD_MISSING;
-//      }
-//
-//      memcpy(new_record_data + field->offset(), value->data, sizeof(Date));
-//    }
+    case DATES:{
+      if(value->type != DATES){
+        LOG_ERROR("Field type is not matching");
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      memcpy(new_record_data + field->offset(), value->data, sizeof(int));
+    }
+      break ;
     default:
       break;
   }

@@ -62,7 +62,7 @@ void value_init_date(Value *value, const char *v)
 {
   value->type = DATES;
   int y,m,d;
-  sscanf(v, "%d-%d-%d", &y, &m, &d);
+  sscanf(v, "\"%d-%d-%d\"", &y, &m, &d);
   bool b = check_date(y,m,d);
   if(!b) {
     LOG_ERROR("DATE FORMAT ERROR");
