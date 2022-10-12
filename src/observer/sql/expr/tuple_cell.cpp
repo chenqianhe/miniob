@@ -20,7 +20,16 @@ See the Mulan PSL v2 for more details. */
 void TupleCell::to_string(std::ostream &os) const
 {
   switch (attr_type_) {
-  case DATES:
+  case DATES:{
+    char buf[16] = {0};
+    snprintf(buf,sizeof(buf),"%04d-%02d-%02d",*(int *)data_/10000,(*(int *)data_%10000)/100,*(int *)data_%100);
+    for (char i : buf) {
+      if (i == '\0') {
+        break;
+      }
+      os << i;
+    }
+  } break;
   case INTS: {
     os << *(int *)data_;
   } break;
