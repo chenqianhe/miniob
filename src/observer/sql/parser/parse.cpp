@@ -390,6 +390,7 @@ void query_reset(Query *query)
     case SCF_DROP_TABLE: {
       drop_table_destroy(&query->sstr.drop_table);
     } break;
+    case SCF_CREATE_UNIQUE_INDEX:
     case SCF_CREATE_INDEX: {
       create_index_destroy(&query->sstr.create_index);
     } break;
