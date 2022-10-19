@@ -58,28 +58,32 @@ void value_init_string(Value *value, const char *v)
   value->type = CHARS;
   value->data = strdup(v);
 }
-void value_init_date(Value *value, const char *v)
+int value_init_date(Value *value, const char *v)
 {
   value->type = DATES;
   int y,m,d;
   const char singleQuote = '\'';
   const char doubleQuote = '\"';
+  int dv = -1;
+  value->data = malloc(sizeof(dv));
   if (v[0] == singleQuote) {
     sscanf(v, "\'%d-%d-%d\'", &y, &m, &d);
   } else if (v[0] == doubleQuote) {
     sscanf(v, "\"%d-%d-%d\"", &y, &m, &d);
   } else {
     LOG_ERROR("DATE TO INTS ERROR");
-    return;
+    memcpy(value->data, &dv, sizeof(dv));
+    return 1;
   }
   bool b = check_date(y,m,d);
   if(!b) {
     LOG_ERROR("DATE FORMAT ERROR");
-    return;
+    memcpy(value->data, &dv, sizeof(dv));
+    return 1;
   }
-  int dv = y*10000+m*100+d;
-  value->data = malloc(sizeof(dv));
+  dv = y*10000+m*100+d;
   memcpy(value->data, &dv, sizeof(dv));
+  return 0;
 }
 void long_value_init_date(Value *value, int v)
 {

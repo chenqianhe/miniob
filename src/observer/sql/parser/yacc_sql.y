@@ -316,7 +316,10 @@ value:
   		value_init_string(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
 	|DATE_STR {
-		value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
+		int check_date = value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
+		if (check_date) {
+			return 1;
+		}
 	}
     ;
     
