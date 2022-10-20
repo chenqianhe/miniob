@@ -509,7 +509,7 @@ RC ExecuteStage::do_create_unique_index(SQLStageEvent *sql_event) {
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name);
+  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name, 1);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }
@@ -561,7 +561,12 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   InsertStmt *insert_stmt = (InsertStmt *)stmt;
 
   Table *table = insert_stmt->table();
-  RC rc = table->insert_record(nullptr, insert_stmt->value_amount(), insert_stmt->values());
+  RC rc = table->check_unique_index_record(insert_stmt->value_amount(), insert_stmt->values());
+  if (rc != RC::SUCCESS) {
+    session_event->set_response("FAILURE\n");
+    return rc;
+  }
+  rc = table->insert_record(nullptr, insert_stmt->value_amount(), insert_stmt->values());
   if (rc == RC::SUCCESS) {
     session_event->set_response("SUCCESS\n");
   } else {
