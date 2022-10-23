@@ -327,6 +327,27 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values)
   return rc;
 }
 
+RC Table::insert_record(Trx *trx, Record *record, int value_num, const Value *values)
+{
+  if (value_num <= 0 || nullptr == values) {
+    LOG_ERROR("Invalid argument. table name: %s, value num=%d, values=%p", name(), value_num, values);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  char *record_data;
+  RC rc = make_record(value_num, values, record_data);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to create a record. rc=%d:%s", rc, strrc(rc));
+    return rc;
+  }
+
+  record->set_data(record_data);
+  // record.valid = true;
+  rc = insert_record(trx, record);
+  delete[] record_data;
+  return rc;
+}
+
 const char *Table::name() const
 {
   return table_meta_.name();

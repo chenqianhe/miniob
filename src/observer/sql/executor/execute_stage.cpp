@@ -44,7 +44,6 @@ See the Mulan PSL v2 for more details. */
 #include "storage/index/index.h"
 #include "storage/default/default_handler.h"
 #include "storage/common/condition_filter.h"
-#include "storage/trx/trx.h"
 
 using namespace common;
 
@@ -559,19 +558,46 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   }
 
   InsertStmt *insert_stmt = (InsertStmt *)stmt;
+  const int values_group_num = insert_stmt->values_group_num();
+  const int value_amount = insert_stmt->value_amount();
 
   Table *table = insert_stmt->table();
-  RC rc = table->check_unique_index_record(insert_stmt->value_amount(), insert_stmt->values());
-  if (rc != RC::SUCCESS) {
-    session_event->set_response("FAILURE\n");
-    return rc;
+  Value *temp_values = (Value*)malloc(sizeof(Value) * value_amount);
+  Trx temp_trx[values_group_num];
+  Record temp_record[values_group_num];
+  RC rc = RC::SUCCESS;
+  int value_group_index;
+  for (value_group_index=0; value_group_index < values_group_num; value_group_index++) {
+    temp_trx[value_group_index] = *new Trx();
+    temp_record[value_group_index] = *new Record();
+    for (int i = 0; i < value_amount; ++i) {
+      temp_values[i].type = insert_stmt->values()[value_group_index*value_amount+i].type;
+      temp_values[i].data = insert_stmt->values()[value_group_index*value_amount+i].data;
+    }
+    rc = insert_record(table, &temp_trx[value_group_index], &temp_record[value_group_index], value_amount, temp_values);
+    if (rc != RC::SUCCESS) {
+      break;
+    }
   }
-  rc = table->insert_record(nullptr, insert_stmt->value_amount(), insert_stmt->values());
   if (rc == RC::SUCCESS) {
     session_event->set_response("SUCCESS\n");
   } else {
+    for (int i = 0; i < value_group_index; ++i) {
+      table->rollback_insert(&temp_trx[i], temp_record[i].rid());
+    }
     session_event->set_response("FAILURE\n");
   }
+  free(temp_values);
+  return rc;
+}
+
+RC ExecuteStage::insert_record(Table *table, Trx *trx, Record *record, int value_num, const Value *values)
+{
+  RC rc = table->check_unique_index_record(value_num, values);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  rc = table->insert_record(trx, record, value_num, values);
   return rc;
 }
 
