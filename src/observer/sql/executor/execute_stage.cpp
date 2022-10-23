@@ -29,6 +29,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/tuple.h"
 #include "sql/operator/table_scan_operator.h"
 #include "sql/operator/index_scan_operator.h"
+#include "sql/operator/pred_mutitable_operator.h"
 #include "sql/operator/predicate_operator.h"
 #include "sql/operator/delete_operator.h"
 #include "sql/operator/project_operator.h"
@@ -44,6 +45,9 @@ See the Mulan PSL v2 for more details. */
 #include "storage/index/index.h"
 #include "storage/default/default_handler.h"
 #include "storage/common/condition_filter.h"
+#include "storage/trx/trx.h"
+#include "sql/expr/TupleSet.h"
+#include "../../util/descartes.h"
 
 using namespace common;
 
@@ -136,7 +140,7 @@ void ExecuteStage::handle_request(common::StageEvent *event)
   if (stmt != nullptr) {
     switch (stmt->type()) {
     case StmtType::SELECT: {
-      do_select(sql_event);
+       (sql_event);
     } break;
     case StmtType::INSERT: {
       do_insert(sql_event);
@@ -224,6 +228,24 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
   const TupleCellSpec *cell_spec = nullptr;
   for (int i = 0; i < cell_num; i++) {
     oper.tuple_cell_spec_at(i, cell_spec);
+    if (i != 0) {
+      os << " | ";
+    }
+
+    if (cell_spec->alias()) {
+      os << cell_spec->alias();
+    }
+  }
+
+  if (cell_num > 0) {
+    os << '\n';
+  }
+}
+void print_tuple_header(std::ostream &os,TupleSet tuple_set){
+  const int cell_num = tuple_set.tuple_cell_num();
+  const TupleCellSpec *cell_spec = nullptr;
+  for (int i = 0; i < cell_num; i++) {
+    tuple_set.tuples()[0]->cell_spec_at(i, cell_spec);
     if (i != 0) {
       os << " | ";
     }
@@ -386,9 +408,58 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
   RC rc = RC::SUCCESS;
-  if (select_stmt->tables().size() != 1) {
-    LOG_WARN("select more than 1 tables is not supported");
-    rc = RC::UNIMPLENMENT;
+  if (select_stmt->tables().size() > 1) {
+    //对每个表进行表内条件过滤，得到每个表差寻出来的结果（一个tupleset），存储到tuple_sets
+    std::vector<TupleSet> tuple_sets;
+    for(Table *table : select_stmt->tables()){
+      Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+      if (nullptr == scan_oper) {
+        scan_oper = new TableScanOperator(table);
+      }
+
+      DEFER([&] () {delete scan_oper;});
+
+      PredicateOperator pred_oper(select_stmt->filter_stmt());
+      pred_oper.add_child(scan_oper);
+      ProjectOperator project_oper;
+      project_oper.add_child(&pred_oper);
+      for (const Field &field : select_stmt->query_fields()) {
+        project_oper.add_projection(field.table(), field.meta());
+      }
+      rc = project_oper.open();
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to open operator");
+        return rc;
+      }
+
+      TupleSet tuple_set;
+      while ((rc = project_oper.next()) == RC::SUCCESS) {
+        // get current record
+        // write to response
+        Tuple * tuple = project_oper.current_tuple();
+        if (nullptr == tuple) {
+          rc = RC::INTERNAL;
+          LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+          break;
+        }
+        tuple_set.add_tuple((ProjectTuple *)tuple);
+      }
+      tuple_sets.push_back(tuple_set);
+    }
+    //对得到的tuple_sets求笛卡尔积
+    TupleSet descartesSet = getDescartes(tuple_sets);
+    //表间过滤
+    TupleSet result;
+    PredMutiOperator pred_oper(select_stmt->filter_stmt(),&descartesSet);
+    pred_oper.get_result(&result);
+    //打印结果
+    std::stringstream ss;
+    print_tuple_header(ss, result);
+    for(ProjectTuple *tuple:result.tuples()){
+      tuple_to_string(ss, *tuple);
+      ss << std::endl;
+    }
+    session_event->set_response(ss.str());
     return rc;
   }
 
