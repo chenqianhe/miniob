@@ -56,6 +56,7 @@ public:
   RC open(const char *meta_file, const char *base_dir);
 
   RC insert_record(Trx *trx, int value_num, const Value *values);
+  RC insert_record(Trx *trx, Record *record, int value_num, const Value *values);
   RC update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num,
       const Condition conditions[], int *updated_count);
   RC update_record(Trx *trx,const char *attribute_name, const Value *value, Record *record);

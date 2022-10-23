@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/parser/parse.h"
 #include "rc.h"
 #include "sql/stmt/update_stmt.h"
+#include "storage/trx/trx.h"
 
 class SQLStageEvent;
 class SessionEvent;
@@ -49,6 +50,7 @@ protected:
   RC do_desc_table(SQLStageEvent *sql_event);
   RC do_select(SQLStageEvent *sql_event);
   RC do_insert(SQLStageEvent *sql_event);
+  RC insert_record(Table *table, Trx *trx, Record *record, int value_num, const Value *values);
   RC do_delete(SQLStageEvent *sql_event);
   RC do_update(SQLStageEvent *sql_event);
 

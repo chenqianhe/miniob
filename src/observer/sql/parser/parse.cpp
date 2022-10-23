@@ -181,7 +181,7 @@ void selects_destroy(Selects *selects)
   selects->condition_num = 0;
 }
 
-void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num)
+void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num, size_t values_group_num)
 {
   assert(value_num <= sizeof(inserts->values) / sizeof(inserts->values[0]));
 
@@ -190,6 +190,7 @@ void inserts_init(Inserts *inserts, const char *relation_name, Value values[], s
     inserts->values[i] = values[i];
   }
   inserts->value_num = value_num;
+  inserts->values_group_num = values_group_num;
 }
 void inserts_destroy(Inserts *inserts)
 {
