@@ -31,8 +31,8 @@ void descartesRecursive(std::vector<TupleSet*>& originalList,int position,std::v
 
 std::vector<RowTuple*> getDescartes(std::vector<TupleSet*>& list){
   std::vector<RowTuple*> returnList;
-  RowTuple line ;
-  descartesRecursive(list,0,returnList,line);
-//  LOG_INFO("descartesRecursive finished,size of tuple is %d",returnList.tuples()[0]->tuple_size());
+  RowTuple *line = new RowTuple();
+  descartesRecursive(list,0,returnList,*line);
+  LOG_INFO("descartesRecursive finished,size of tuple is %d",returnList[0]->cell_num());
   return returnList;
 }
