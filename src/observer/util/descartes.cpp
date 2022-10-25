@@ -12,9 +12,8 @@ void descartesRecursive(std::vector<TupleSet*>& originalList,int position,std::v
     int size = tmp->cell_num();
 //    LOG_INFO("cell num of tupleset[%d] is %d",position,size);
     for(int j = 0;j < size;j++){
-      const TupleCellSpec *cell_spec = new TupleCellSpec();
-      tmp->cell_spec_at(j,cell_spec);
-      line.add_cell_spec((TupleCellSpec*)cell_spec);
+      TupleCellSpec *cell_spec = new TupleCellSpec();
+      line.add_cell_spec(cell_spec);
     }
 //    LOG_INFO("add success,size of tuple is %d",line.tuple_size());
     if(position == originalList.size() - 1){
