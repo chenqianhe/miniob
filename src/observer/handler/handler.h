@@ -27,10 +27,19 @@ See the Mulan PSL v2 for more details. */
 
 #include "rc.h"
 
+typedef enum {
+  None,
+  Min,
+  Max,
+  Count,
+  Avg
+} AggrType;
+
 //属性结构体
 typedef struct {
   char *relName;   // relation name (may be NULL) 表名
   char *attrName;  // attribute name              属性名
+  AggrType aggrType;
 } RelAttr;
 
 typedef enum {

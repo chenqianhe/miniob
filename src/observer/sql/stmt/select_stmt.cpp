@@ -65,9 +65,12 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
+  bool aggr_flag = false;
   for (int i = select_sql.attr_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.attributes[i];
-
+    if (relation_attr.aggr_type != None) {
+      aggr_flag = true;
+    }
     if (common::is_blank(relation_attr.relation_name) && 0 == strcmp(relation_attr.attribute_name, "*")) {
       //单表查询，无表名
       for (Table *table : tables) {
@@ -105,8 +108,10 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
             LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), field_name);
             return RC::SCHEMA_FIELD_MISSING;
           }
-
-        query_fields.push_back(Field(table, field_meta));
+          if (relation_attr.aggr_type == Avg && (field_meta->type() == CHARS || field_meta->type() == DATES)) {
+            return RC::MISMATCH;
+          }
+          query_fields.push_back(Field(table, field_meta));
         }
       }
     } else {
@@ -121,7 +126,9 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
         LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), relation_attr.attribute_name);
         return RC::SCHEMA_FIELD_MISSING;
       }
-
+      if (relation_attr.aggr_type == Avg && (field_meta->type() == CHARS || field_meta->type() == DATES)) {
+        return RC::MISMATCH;
+      }
       query_fields.push_back(Field(table, field_meta));
     }
   }
@@ -144,6 +151,14 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
+  if (aggr_flag) {
+    for (int i = 0; i < select_sql.attr_num; ++i) {
+      if (select_sql.attributes[i].aggr_type) {
+        select_stmt->aggr_attribute_num_ ++;
+        select_stmt->attributes_[i] = select_sql.attributes[i];
+      }
+    }
+  }
   select_stmt->tables_.swap(tables);
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;

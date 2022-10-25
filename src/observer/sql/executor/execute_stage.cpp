@@ -163,6 +163,9 @@ void ExecuteStage::handle_request(common::StageEvent *event)
     case SCF_CREATE_INDEX: {
       do_create_index(sql_event);
     } break;
+    case SCF_CREATE_UNIQUE_INDEX: {
+      do_create_unique_index(sql_event);
+    } break;
     case SCF_SHOW_TABLES: {
       do_show_tables(sql_event);
     } break;
@@ -238,15 +241,18 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
     os << '\n';
   }
 }
-void print_tuple_header_set(std::ostream &os,std::vector<Field > query_fields){
-  for(int i = 0;i < query_fields.size();i++){
+
+void print_aggr(std::ostream &os, std::vector<std::string> content)
+{
+  for (int i = 0; i < content.size(); i++) {
     if (i != 0) {
       os << " | ";
     }
-    os<<query_fields[i].table_name()<<'.'<<query_fields[i].field_name();
+    os << content[i];
   }
-  os<<'\n';
+  os << '\n';
 }
+
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
   TupleCell cell;
@@ -390,238 +396,86 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
   return oper;
 }
-IndexScanOperator *try_to_create_index_scan_operator_with_table(FilterStmt *filter_stmt,Table *default_table)
+
+std::string ExecuteStage::format(double raw_data, bool is_date)
 {
-  const std::vector<FilterUnit *> &filter_units = filter_stmt->filter_units();
-  if (filter_units.empty() ) {
-    return nullptr;
-  }
-
-  // 在所有过滤条件中，找到字段与值做比较的条件，然后判断字段是否可以使用索引
-  // 如果是多列索引，这里的处理需要更复杂。
-  // 这里的查找规则是比较简单的，就是尽量找到使用相等比较的索引
-  // 如果没有就找范围比较的，但是直接排除不等比较的索引查询. (你知道为什么?)
-  const FilterUnit *better_filter = nullptr;
-  for (const FilterUnit * filter_unit : filter_units) {
-    if (filter_unit->comp() == NOT_EQUAL) {
-      continue;
+  if (!is_date) {
+    int temp = raw_data;
+    if (temp == raw_data) {
+      return std::to_string(temp);
+    } else {
+      char buf[MAX_NUM] = {0};
+      snprintf(buf,sizeof(buf),"%.1lf", raw_data);
+      return std::string(buf);
     }
-
-    Expression *left = filter_unit->left();
-    Expression *right = filter_unit->right();
-    if (left->type() == ExprType::FIELD && right->type() == ExprType::VALUE) {
-    } else if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
-      std::swap(left, right);
-    }
-    FieldExpr &left_field_expr = *(FieldExpr *)left;
-    const Field &field = left_field_expr.field();
-    const Table *table = field.table();
-    if(strcmp(table->name(),default_table->name())!=0){
-      LOG_INFO("not this table");
-      continue;
-    }
-
-    Index *index = table->find_index_by_field(field.field_name());
-    if (index != nullptr) {
-      if (better_filter == nullptr) {
-        better_filter = filter_unit;
-      } else if (filter_unit->comp() == EQUAL_TO) {
-        better_filter = filter_unit;
-        break;
-      }
-    }
+  } else {
+    char buf[16] = {0};
+    int data_ = raw_data;
+    snprintf(buf,sizeof(buf),"%04d-%02d-%02d", data_/10000, (data_%10000)/100, data_%100);
+    return std::string(buf);
   }
-
-  if (better_filter == nullptr) {
-    return nullptr;
-  }
-
-  Expression *left = better_filter->left();
-  Expression *right = better_filter->right();
-  CompOp comp = better_filter->comp();
-  if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
-    std::swap(left, right);
-    switch (comp) {
-      case EQUAL_TO:    { comp = EQUAL_TO; }    break;
-      case LESS_EQUAL:  { comp = GREAT_THAN; }  break;
-      case NOT_EQUAL:   { comp = NOT_EQUAL; }   break;
-      case LESS_THAN:   { comp = GREAT_EQUAL; } break;
-      case GREAT_EQUAL: { comp = LESS_THAN; }   break;
-      case GREAT_THAN:  { comp = LESS_EQUAL; }  break;
-      default: {
-        LOG_WARN("should not happen");
-      }
-    }
-  }
-
-
-  FieldExpr &left_field_expr = *(FieldExpr *)left;
-  const Field &field = left_field_expr.field();
-  const Table *table = field.table();
-
-  Index *index = table->find_index_by_field(field.field_name());
-  assert(index != nullptr);
-
-  ValueExpr &right_value_expr = *(ValueExpr *)right;
-  TupleCell value;
-  right_value_expr.get_tuple_cell(value);
-
-  const TupleCell *left_cell = nullptr;
-  const TupleCell *right_cell = nullptr;
-  bool left_inclusive = false;
-  bool right_inclusive = false;
-
-  switch (comp) {
-    case EQUAL_TO: {
-      left_cell = &value;
-      right_cell = &value;
-      left_inclusive = true;
-      right_inclusive = true;
-    } break;
-
-    case LESS_EQUAL: {
-      left_cell = nullptr;
-      left_inclusive = false;
-      right_cell = &value;
-      right_inclusive = true;
-    } break;
-
-    case LESS_THAN: {
-      left_cell = nullptr;
-      left_inclusive = false;
-      right_cell = &value;
-      right_inclusive = false;
-    } break;
-
-    case GREAT_EQUAL: {
-      left_cell = &value;
-      left_inclusive = true;
-      right_cell = nullptr;
-      right_inclusive = false;
-    } break;
-
-    case GREAT_THAN: {
-      left_cell = &value;
-      left_inclusive = false;
-      right_cell = nullptr;
-      right_inclusive = false;
-    } break;
-
-    default: {
-      LOG_WARN("should not happen. comp=%d", comp);
-    } break;
-  }
-
-  IndexScanOperator *oper = new IndexScanOperator(table, index,
-      left_cell, left_inclusive, right_cell, right_inclusive);
-
-  LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
-  return oper;
 }
 
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
+  bool aggr_mode = select_stmt->aggr_attribute_num() > 0;
   RC rc = RC::SUCCESS;
-  //多表查询c
   if (select_stmt->tables().size() > 1) {
     //对每个表进行表内条件过滤，得到每个表差寻出来的结果（一个tupleset），存储到tuple_sets
-    std::vector<TupleSet*> tuple_sets;
-
+    std::vector<TupleSet> tuple_sets;
     for(Table *table : select_stmt->tables()){
-      //遍历所有d
-      Operator *scan_oper = try_to_create_index_scan_operator_with_table(select_stmt->filter_stmt(),table);
+      Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
       if (nullptr == scan_oper) {
-        LOG_INFO("create index scan operator failed");
         scan_oper = new TableScanOperator(table);
-        if (nullptr == scan_oper) {
-          LOG_INFO("create table scan operator failed");
-        }
       }
-//      DEFER([&] () {delete scan_oper;});
 
-      PredicateOperator *pred_oper = new PredicateOperator(select_stmt->filter_stmt());
-      pred_oper->add_child(scan_oper);
-      ProjectOperator *project_oper = new ProjectOperator();
-      project_oper->add_child(pred_oper);
+      DEFER([&] () {delete scan_oper;});
+
+      PredicateOperator pred_oper(select_stmt->filter_stmt());
+      pred_oper.add_child(scan_oper);
+      ProjectOperator project_oper;
+      project_oper.add_child(&pred_oper);
       for (const Field &field : select_stmt->query_fields()) {
-        if(strcmp(table->name(),field.table_name())!=0){
-//          LOG_INFO("not this table");
-          continue;
-        }
-        project_oper->add_projection(field.table(), field.meta());
+        project_oper.add_projection(field.table(), field.meta());
       }
-      rc = project_oper->open();
+      rc = project_oper.open();
       if (rc != RC::SUCCESS) {
         LOG_WARN("failed to open operator");
         return rc;
       }
 
-      TupleSet *tuple_set = new TupleSet();
-      std::stringstream ss;
-      print_tuple_header(ss, *project_oper);
-      while ((rc = project_oper->next()) == RC::SUCCESS) {
+      TupleSet tuple_set;
+      while ((rc = project_oper.next()) == RC::SUCCESS) {
         // get current record
         // write to response
-        Tuple * tuple = project_oper->current_tuple();
+        Tuple * tuple = project_oper.current_tuple();
         if (nullptr == tuple) {
           rc = RC::INTERNAL;
           LOG_WARN("failed to get current record. rc=%s", strrc(rc));
           break;
         }
-        tuple_set->add_tuple(tuple);
-        tuple_to_string(ss, *tuple);
-        ss << std::endl;
-
+        tuple_set.add_tuple((ProjectTuple *)tuple);
       }
-      LOG_INFO("The result is\n%s",ss.str().c_str());
       tuple_sets.push_back(tuple_set);
     }
-//    std::stringstream ss1;
-//    Tuple *tuple = tuple_sets[0]->tuples()[0];
-//    tuple_to_string(ss1, *tuple);
-//    ss1 << std::endl;
-//    LOG_INFO("tupleset %d tuple %d is %s",0,0,ss1.str().c_str());
-    LOG_INFO("the size of tuple_sets is %d",tuple_sets.size());
-    for(int i = 0;i < tuple_sets.size();i++){
-      std::vector<Tuple *> tuples = tuple_sets[i]->tuples();
-      std::stringstream ss1;
-      for(int j = 0;j < tuples.size();j++){
-        Tuple *tuple = tuples[j];
-        tuple_to_string(ss1, *tuple);
-        ss1 << std::endl;
-        LOG_INFO("tupleset %d tuple %d is %s",i,j,ss1.str().c_str());
-      }
-      LOG_INFO("The result is\n%s",ss1.str().c_str());
-    }
     //对得到的tuple_sets求笛卡尔积
-//    for(int i = 0;i < tuple_sets.size();i++){
-//      LOG_INFO("the size of tupleset %d is %d",i,tuple_sets[i]->size());
-////      Tuple *tuple = tuple_sets[i].tuples()[0];
-////      LOG_INFO("the cellnum of tupleset %d is %d",i,tuple->cell_num());
-//    }
-
-    std::vector<ProjectTuple*> descartesSet = getDescartes(tuple_sets);
-    LOG_INFO("already get descartesSet,size is %d",descartesSet.size());
-    LOG_INFO("already get descartesSet,size of tuple is %d",descartesSet[0]->tuple_size());
+    TupleSet descartesSet = getDescartes(tuple_sets);
     //表间过滤
     TupleSet result;
-    PredMutiOperator *pred_oper = new PredMutiOperator(select_stmt->filter_stmt(),&descartesSet);
-    pred_oper->get_result(&result);
+    PredMutiOperator pred_oper(select_stmt->filter_stmt(),&descartesSet);
+    pred_oper.get_result(&result);
     //打印结果
     std::stringstream ss;
-//    print_tuple_header_set(ss, result);
-    for(Tuple *tuple:result.tuples()){
+    print_tuple_header(ss, result);
+    for(ProjectTuple *tuple:result.tuples()){
       tuple_to_string(ss, *tuple);
       ss << std::endl;
     }
-    LOG_INFO("result is\n%s",ss.str().c_str());
     session_event->set_response(ss.str());
     return rc;
   }
-
-
 
   Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
   if (nullptr == scan_oper) {
@@ -630,6 +484,9 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   DEFER([&] () {delete scan_oper;});
 
+  // count, avg/idx, min, max
+  std::vector<std::vector<double>> count;
+  std::vector<std::vector<std::string>> count_char;
 
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
@@ -637,28 +494,140 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
     project_oper.add_projection(field.table(), field.meta());
+    count.emplace_back(std::vector<double>(2, 0));
+    count[count.size()-1].emplace_back(std::numeric_limits<float>::max());
+    count[count.size()-1].emplace_back(std::numeric_limits<float>::lowest());
+    if(field.meta()->type() == CHARS) {
+      count_char.emplace_back(std::vector<std::string>(2));
+    }
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open operator");
     return rc;
   }
+
   std::stringstream ss;
-  print_tuple_header(ss, project_oper);
-  while ((rc = project_oper.next()) == RC::SUCCESS) {
-    // get current record
-    // write to response
-    Tuple * tuple = project_oper.current_tuple();
-    if (nullptr == tuple) {
-      rc = RC::INTERNAL;
-      LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-      break;
+  if (aggr_mode) {
+    while ((rc = project_oper.next()) == RC::SUCCESS) {
+      // get current record
+      Tuple * tuple = project_oper.current_tuple();
+      if (nullptr == tuple) {
+        rc = RC::INTERNAL;
+        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+        return rc;
+      }
+      TupleCell cell;
+      bool first_field = true;
+      int count_char_index = 0;
+      for (int i = 0; i < tuple->cell_num(); i++) {
+        rc = tuple->cell_at(i, cell);
+        if (rc != RC::SUCCESS) {
+          LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
+          return rc;
+        }
+        switch (cell.attr_type()) {
+          case CHARS:{
+            count[i][0] ++;
+            count[i][1] = count_char_index;
+            if (count_char[count_char_index][0].empty() || count_char[count_char_index][1].empty()) {
+              count_char[count_char_index][0] = std::string(cell.data());
+              count_char[count_char_index][1] = std::string(cell.data());
+            } else {
+              if (std::string(cell.data()) < count_char[count_char_index][0]) {
+                count_char[count_char_index][0] = std::string(cell.data());
+              }
+              if (std::string(cell.data()) > count_char[count_char_index][0]) {
+                count_char[count_char_index][1] = std::string(cell.data());
+              }
+            }
+            count_char_index ++;
+          }
+            break;
+          case INTS:{
+            count[i][0] ++;
+            count[i][1] += *(int*)cell.data();
+            count[i][2] = *(int*)cell.data() < count[i][2] ? *(int*)cell.data() : count[i][2];
+            count[i][3] = *(int*)cell.data() > count[i][3] ? *(int*)cell.data() : count[i][3];
+          }
+            break;
+          case FLOATS:{
+            count[i][0] ++;
+            count[i][1] += *(float*)cell.data();
+            count[i][2] = *(float*)cell.data() < count[i][2] ? *(float*)cell.data() : count[i][2];
+            count[i][3] = *(float*)cell.data() > count[i][3] ? *(float*)cell.data() : count[i][3];
+          }
+            break;
+          case DATES:{
+            count[i][0] ++;
+            count[i][2] = *(int*)cell.data() < count[i][2] ? *(int*)cell.data() : count[i][2];
+            count[i][3] = *(int*)cell.data() > count[i][3] ? *(int*)cell.data() : count[i][3];
+          }
+            break;
+          case UNDEFINED:
+            break;
+        }
+        count_char_index = 0;
+      }
     }
 
-    tuple_to_string(ss, *tuple);
-    ss << std::endl;
-  }
+    std::vector<std::string> names;
+    std::vector<std::string> outs;
+    for (int i = 0; i < select_stmt->aggr_attribute_num(); ++i) {
+      RelAttr relation_attr = select_stmt->get_aggr_attribute(i);
+      switch (relation_attr.aggr_type) {
+        case Count: {
+          names.emplace_back("COUNT");
+          outs.emplace_back(format(count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+        } break;
+        case Avg: {
+          names.emplace_back("AVG");
+          outs.emplace_back(format(count[i][1] / count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+        } break;
+        case Max: {
+          names.emplace_back("MAX");
+          if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
+            outs.emplace_back(count_char[count[i][1]][1]);
+            std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+          } else {
+            outs.emplace_back(format(count[i][3], select_stmt->query_fields()[i].meta()->type() == DATES));
+          }
+        } break;
+        case Min: {
+          names.emplace_back("MIN");
+          if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
+            outs.emplace_back(count_char[count[i][1]][0]);
+            std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+          } else {
+            outs.emplace_back(format(count[i][2], select_stmt->query_fields()[i].meta()->type() == DATES));
+          }
+        } break;
+        case None:
+          break;
+      }
+      names[names.size()-1] += "(";
+      names[names.size()-1] += relation_attr.attribute_name;
+      names[names.size()-1] += ")";
+      std::transform(names[names.size()-1].begin(), names[names.size()-1].end(), names[names.size()-1].begin(), ::toupper);
+    }
+    print_aggr(ss, names);
+    print_aggr(ss, outs);
+  } else {
+    print_tuple_header(ss, project_oper);
+    while ((rc = project_oper.next()) == RC::SUCCESS) {
+      // get current record
+      // write to response
+      Tuple * tuple = project_oper.current_tuple();
+      if (nullptr == tuple) {
+        rc = RC::INTERNAL;
+        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+        break;
+      }
 
+      tuple_to_string(ss, *tuple);
+      ss << std::endl;
+    }
+  }
   if (rc != RC::RECORD_EOF) {
     LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
     project_oper.close();
@@ -729,6 +698,21 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
   return rc;
 }
 
+RC ExecuteStage::do_create_unique_index(SQLStageEvent *sql_event) {
+  SessionEvent *session_event = sql_event->session_event();
+  Db *db = session_event->session()->get_current_db();
+  const CreateIndex &create_index = sql_event->query()->sstr.create_index;
+  Table *table = db->find_table(create_index.relation_name);
+  if (nullptr == table) {
+    session_event->set_response("FAILURE\n");
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name, 1);
+  sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
+  return rc;
+}
+
 RC ExecuteStage::do_show_tables(SQLStageEvent *sql_event)
 {
   SessionEvent *session_event = sql_event->session_event();
@@ -774,14 +758,46 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   }
 
   InsertStmt *insert_stmt = (InsertStmt *)stmt;
+  const int values_group_num = insert_stmt->values_group_num();
+  const int value_amount = insert_stmt->value_amount();
 
   Table *table = insert_stmt->table();
-  RC rc = table->insert_record(nullptr, insert_stmt->value_amount(), insert_stmt->values());
+  Value *temp_values = (Value*)malloc(sizeof(Value) * value_amount);
+  Trx temp_trx[values_group_num];
+  Record temp_record[values_group_num];
+  RC rc = RC::SUCCESS;
+  int value_group_index;
+  for (value_group_index=0; value_group_index < values_group_num; value_group_index++) {
+    temp_trx[value_group_index] = *new Trx();
+    temp_record[value_group_index] = *new Record();
+    for (int i = 0; i < value_amount; ++i) {
+      temp_values[i].type = insert_stmt->values()[value_group_index*value_amount+i].type;
+      temp_values[i].data = insert_stmt->values()[value_group_index*value_amount+i].data;
+    }
+    rc = insert_record(table, &temp_trx[value_group_index], &temp_record[value_group_index], value_amount, temp_values);
+    if (rc != RC::SUCCESS) {
+      break;
+    }
+  }
   if (rc == RC::SUCCESS) {
     session_event->set_response("SUCCESS\n");
   } else {
+    for (int i = 0; i < value_group_index; ++i) {
+      table->rollback_insert(&temp_trx[i], temp_record[i].rid());
+    }
     session_event->set_response("FAILURE\n");
   }
+  free(temp_values);
+  return rc;
+}
+
+RC ExecuteStage::insert_record(Table *table, Trx *trx, Record *record, int value_num, const Value *values)
+{
+  RC rc = table->check_unique_index_record(value_num, values);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  rc = table->insert_record(trx, record, value_num, values);
   return rc;
 }
 

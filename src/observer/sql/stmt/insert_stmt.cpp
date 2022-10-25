@@ -18,8 +18,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/table.h"
 #include "util/date.h"
 
-InsertStmt::InsertStmt(Table *table, const Value *values, int value_amount)
-  : table_ (table), values_(values), value_amount_(value_amount)
+InsertStmt::InsertStmt(Table *table, const Value *values, int value_amount, int values_group_num)
+  : table_ (table), values_(values), value_amount_(value_amount), values_group_num_(values_group_num)
 {}
 
 RC InsertStmt::create(Db *db, Inserts &inserts, Stmt *&stmt)
@@ -41,27 +41,30 @@ RC InsertStmt::create(Db *db, Inserts &inserts, Stmt *&stmt)
   // check the fields number
   Value *values = inserts.values;
   const int value_num = inserts.value_num;
+  const int values_group_num = inserts.values_group_num;
   const TableMeta &table_meta = table->table_meta();
   const int field_num = table_meta.field_num() - table_meta.sys_field_num();
-  if (field_num != value_num) {
-    LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
+  if (field_num * values_group_num != value_num) {
+    LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num * values_group_num);
     return RC::SCHEMA_FIELD_MISSING;
   }
 
   // check fields type
   const int sys_field_num = table_meta.sys_field_num();
-  for (int i = 0; i < value_num; i++) {
-    const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
-    const AttrType field_type = field_meta->type();
-    const AttrType value_type = values[i].type;
-    if (field_type != value_type) { // TODO try to convert the value type to field type
-      LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d", 
-               table_name, field_meta->name(), field_type, value_type);
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  for (int value_group_index=0; value_group_index < values_group_num; value_group_index++) {
+    for (int i = 0; i < field_num; i++) {
+      const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
+      const AttrType field_type = field_meta->type();
+      const AttrType value_type = values[value_group_index*field_num+i].type;
+      if (field_type != value_type) { // TODO try to convert the value type to field type
+        LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
+            table_name, field_meta->name(), field_type, value_type);
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
     }
   }
 
   // everything alright
-  stmt = new InsertStmt(table, values, value_num);
+  stmt = new InsertStmt(table, values, field_num, values_group_num);
   return RC::SUCCESS;
 }

@@ -23,10 +23,19 @@ See the Mulan PSL v2 for more details. */
 #define MAX_ERROR_MESSAGE 20
 #define MAX_DATA 50
 
+typedef enum {
+  None,
+  Min,
+  Max,
+  Count,
+  Avg
+} AggrType;
+
 //属性结构体
 typedef struct {
   char *relation_name;   // relation name (may be NULL) 表名
   char *attribute_name;  // attribute name              属性名
+  AggrType aggr_type;
 } RelAttr;
 
 typedef enum {
@@ -81,6 +90,7 @@ typedef struct {
 typedef struct {
   char *relation_name;    // Relation to insert into
   size_t value_num;       // Length of values
+  size_t values_group_num;      // Length of values group
   Value values[MAX_NUM];  // values to insert
 } Inserts;
 
@@ -163,6 +173,7 @@ enum SqlCommandFlag {
   SCF_CREATE_TABLE,
   SCF_DROP_TABLE,
   SCF_CREATE_INDEX,
+  SCF_CREATE_UNIQUE_INDEX,
   SCF_DROP_INDEX,
   SCF_SYNC,
   SCF_SHOW_TABLES,
@@ -184,7 +195,7 @@ typedef struct Query {
 extern "C" {
 #endif  // __cplusplus
 
-void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name);
+void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name, AggrType aggr_type);
 void relation_attr_destroy(RelAttr *relation_attr);
 
 void value_init_integer(Value *value, int v);
@@ -207,7 +218,7 @@ void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_destroy(Selects *selects);
 
-void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num);
+void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num, size_t values_group_num);
 void inserts_destroy(Inserts *inserts);
 
 void deletes_init_relation(Deletes *deletes, const char *relation_name);
