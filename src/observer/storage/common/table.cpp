@@ -715,19 +715,18 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
   char *new_record_data = new char[table_meta_.record_size()];
   memcpy(new_record_data,record->data(),table_meta_.record_size());
 //  LOG_INFO("new record data has copied");
-    //  删除原有record
-//  LOG_INFO("try to delete old record");
-  rc = delete_record(nullptr,record);
-//  LOG_INFO("finished delete old record");
-    //  修改record
 
+    //  修改record
   switch (field->type()) {
     case INTS: {
       if (value->type != INTS) {
         LOG_ERROR("Field type is not matching");
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
-
+      rc = delete_record(nullptr,record);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
       memcpy(new_record_data+ field->offset(), value->data, sizeof(int));
 
     }
@@ -736,6 +735,10 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
       if(value->type != CHARS){
         LOG_ERROR("Field type is not matching");
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+      rc = delete_record(nullptr,record);
+      if (rc != RC::SUCCESS) {
+        return rc;
       }
       size_t copy_len = field->len();
       const size_t data_len = strlen((const char *)value->data);
@@ -751,7 +754,10 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
         LOG_ERROR("Field type is not matching");
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
-
+      rc = delete_record(nullptr,record);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
       memcpy(new_record_data + field->offset(), value->data, sizeof(float));
 
     }
@@ -762,7 +768,10 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
         LOG_ERROR("Field type is not matching , type = %d",value->type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
-
+      rc = delete_record(nullptr,record);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
       memcpy(new_record_data + field->offset(), value->data, sizeof(int));
     }
       break ;
