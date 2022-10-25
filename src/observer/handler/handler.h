@@ -113,6 +113,7 @@ struct _AttrInfo {
   char *attrName;     // Attribute name
   AttrType attrType;  // Type of attribute
   int attrLength;     // Length of attribute
+  int nullAble = 0;
 };
 // struct of craete_table
 typedef struct {
