@@ -30,7 +30,7 @@ Tuple * PredMutiOperator::current_tuple()
 bool PredMutiOperator:: do_predicate(ProjectTuple &tuple)
 {
   if (filter_stmt_ == nullptr || filter_stmt_->filter_units().empty()) {
-    LOG_ERROR("filter can't be 0");
+    return true;
   }
   bool filter_result = false;
   for (const FilterUnit *filter_unit : filter_stmt_->filter_units()) {
@@ -81,8 +81,9 @@ bool PredMutiOperator:: do_predicate(ProjectTuple &tuple)
 void PredMutiOperator::get_result(TupleSet *result)
 {
   for(int i = 0;i<tuple_set_->size();i++){
-    if(do_predicate(*tuple_set_->get(i))){
-      result->add_tuple(tuple_set_->get(i));
+    ProjectTuple *tuple = (*tuple_set_)[i];
+    if(do_predicate(*tuple)){
+      result->add_tuple(tuple);
     }
   }
 }

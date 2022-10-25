@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_operator.h"
 #include "storage/common/record.h"
 #include "storage/common/table.h"
+#include <string.h>
 
 RC ProjectOperator::open()
 {

@@ -97,7 +97,9 @@ public:
       speces_.push_back(new TupleCellSpec(new FieldExpr(table, &field)));
     }
   }
-
+    int tuple_size(){
+      return speces_.size();
+    }
   int cell_num() const override
   {
     return speces_.size();
@@ -146,6 +148,22 @@ public:
     spec = speces_[index];
     return RC::SUCCESS;
   }
+   void add_cell_spec(TupleCellSpec *spec)
+    {
+      speces_.push_back(spec);
+  //    LOG_INFO("add cell spec success");
+    }
+    TupleCellSpec *get(int i){
+      return speces_[i];
+
+    }
+
+    void remove(int size){
+      for(int i = 0; i < size; i++){
+        speces_.pop_back();
+      }
+    }
+
 
   Record &record()
   {
@@ -191,20 +209,18 @@ public:
     this->tuple_ = tuple;
   }
 
-  void add_cell_spec(TupleCellSpec *spec)
+ void add_cell_spec(TupleCellSpec *spec)
   {
     speces_.push_back(spec);
+//    LOG_INFO("add cell spec success");
   }
 
-  void add(ProjectTuple tuple){
-    int size = tuple.cell_num();
-    for(int i = 0; i < size; i++){
-      this->add_cell_spec(tuple.find_cell_by_index(i));
-    }
+  TupleCellSpec *get(int i){
+    return speces_[i];
+
   }
 
-  void remove(ProjectTuple tuple){
-    int size = tuple.cell_num();
+  void remove(int size){
     for(int i = 0; i < size; i++){
       speces_.pop_back();
     }
@@ -212,8 +228,14 @@ public:
   TupleCellSpec* find_cell_by_index(int index){
     return speces_[index];
   }
+
+
   int cell_num() const override
   {
+    return speces_.size();
+  }
+
+  int tuple_size(){
     return speces_.size();
   }
 

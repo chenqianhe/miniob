@@ -13,30 +13,25 @@ class TupleSet {
 
 public:
   TupleSet()=default;
-  virtual ~TupleSet(){
-    for (ProjectTuple *tuple : tuple_set_) {
-      delete tuple;
-    }
-    tuple_set_.clear();
-  }
-  void add_tuple(ProjectTuple *tuple){
+  virtual ~TupleSet()=default;
+  void add_tuple(Tuple *tuple){
     tuple_set_.push_back(tuple);
   }
   int size(){
     return tuple_set_.size();
   }
-  std::vector<ProjectTuple *> tuples(){
+  std::vector<Tuple *> tuples(){
     return tuple_set_;
   }
-  ProjectTuple* get(int index){
+  Tuple* get(int index){
     return tuple_set_[index];
   }
-  int tuple_cell_num(){
-    return tuple_set_[0]->cell_num();
-  }
+//  int tuple_cell_num(){
+//    return tuple_set_[0]->tuple_size();
+//  }
 
 private:
-  std::vector<ProjectTuple *> tuple_set_;
+  std::vector<Tuple *> tuple_set_;
 };
 
 #endif  // MINIDB_TUPLESET_H

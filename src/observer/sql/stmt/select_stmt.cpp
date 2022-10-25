@@ -69,15 +69,18 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     const RelAttr &relation_attr = select_sql.attributes[i];
 
     if (common::is_blank(relation_attr.relation_name) && 0 == strcmp(relation_attr.attribute_name, "*")) {
+      //单表查询，无表名
       for (Table *table : tables) {
         wildcard_fields(table, query_fields);
       }
 
     } else if (!common::is_blank(relation_attr.relation_name)) { // TODO
+      //多表查询，有表名
       const char *table_name = relation_attr.relation_name;
       const char *field_name = relation_attr.attribute_name;
 
       if (0 == strcmp(table_name, "*")) {
+
         if (0 != strcmp(field_name, "*")) {
           LOG_WARN("invalid field name while table is *. attr=%s", field_name);
           return RC::SCHEMA_FIELD_MISSING;
@@ -86,6 +89,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
           wildcard_fields(table, query_fields);
         }
       } else {
+
         auto iter = table_map.find(table_name);
         if (iter == table_map.end()) {
           LOG_WARN("no such table in from list: %s", table_name);
@@ -144,5 +148,6 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   stmt = select_stmt;
+//  LOG_INFO("succed in creating stmt");
   return RC::SUCCESS;
 }
