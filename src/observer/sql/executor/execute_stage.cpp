@@ -140,7 +140,7 @@ void ExecuteStage::handle_request(common::StageEvent *event)
   if (stmt != nullptr) {
     switch (stmt->type()) {
     case StmtType::SELECT: {
-       (sql_event);
+       do_select(sql_event);
     } break;
     case StmtType::INSERT: {
       do_insert(sql_event);
@@ -241,24 +241,18 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
     os << '\n';
   }
 }
-void print_tuple_header(std::ostream &os,TupleSet tuple_set){
-  const int cell_num = tuple_set.tuple_cell_num();
-  const TupleCellSpec *cell_spec = nullptr;
-  for (int i = 0; i < cell_num; i++) {
-    tuple_set.tuples()[0]->cell_spec_at(i, cell_spec);
+
+void print_aggr(std::ostream &os, std::vector<std::string> content)
+{
+  for (int i = 0; i < content.size(); i++) {
     if (i != 0) {
       os << " | ";
     }
-
-    if (cell_spec->alias()) {
-      os << cell_spec->alias();
-    }
+    os << content[i];
   }
-
-  if (cell_num > 0) {
-    os << '\n';
-  }
+  os << '\n';
 }
+
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
   TupleCell cell;
@@ -403,10 +397,30 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   return oper;
 }
 
+std::string ExecuteStage::format(double raw_data, bool is_date)
+{
+  if (!is_date) {
+    int temp = raw_data;
+    if (temp == raw_data) {
+      return std::to_string(temp);
+    } else {
+      char buf[MAX_NUM] = {0};
+      snprintf(buf,sizeof(buf),"%.1lf", raw_data);
+      return std::string(buf);
+    }
+  } else {
+    char buf[16] = {0};
+    int data_ = raw_data;
+    snprintf(buf,sizeof(buf),"%04d-%02d-%02d", data_/10000, (data_%10000)/100, data_%100);
+    return std::string(buf);
+  }
+}
+
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
+  bool aggr_mode = select_stmt->aggr_attribute_num() > 0;
   RC rc = RC::SUCCESS;
   if (select_stmt->tables().size() > 1) {
     //对每个表进行表内条件过滤，得到每个表差寻出来的结果（一个tupleset），存储到tuple_sets
@@ -470,12 +484,22 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   DEFER([&] () {delete scan_oper;});
 
+  // count, avg/idx, min, max
+  std::vector<std::vector<double>> count;
+  std::vector<std::vector<std::string>> count_char;
+
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
     project_oper.add_projection(field.table(), field.meta());
+    count.emplace_back(std::vector<double>(2, 0));
+    count[count.size()-1].emplace_back(std::numeric_limits<float>::max());
+    count[count.size()-1].emplace_back(std::numeric_limits<float>::lowest());
+    if(field.meta()->type() == CHARS) {
+      count_char.emplace_back(std::vector<std::string>(2));
+    }
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
@@ -484,21 +508,126 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   std::stringstream ss;
-  print_tuple_header(ss, project_oper);
-  while ((rc = project_oper.next()) == RC::SUCCESS) {
-    // get current record
-    // write to response
-    Tuple * tuple = project_oper.current_tuple();
-    if (nullptr == tuple) {
-      rc = RC::INTERNAL;
-      LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-      break;
+  if (aggr_mode) {
+    while ((rc = project_oper.next()) == RC::SUCCESS) {
+      // get current record
+      Tuple * tuple = project_oper.current_tuple();
+      if (nullptr == tuple) {
+        rc = RC::INTERNAL;
+        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+        return rc;
+      }
+      TupleCell cell;
+      bool first_field = true;
+      int count_char_index = 0;
+      for (int i = 0; i < tuple->cell_num(); i++) {
+        rc = tuple->cell_at(i, cell);
+        if (rc != RC::SUCCESS) {
+          LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
+          return rc;
+        }
+        switch (cell.attr_type()) {
+          case CHARS:{
+            count[i][0] ++;
+            count[i][1] = count_char_index;
+            if (count_char[count_char_index][0].empty() || count_char[count_char_index][1].empty()) {
+              count_char[count_char_index][0] = std::string(cell.data());
+              count_char[count_char_index][1] = std::string(cell.data());
+            } else {
+              if (std::string(cell.data()) < count_char[count_char_index][0]) {
+                count_char[count_char_index][0] = std::string(cell.data());
+              }
+              if (std::string(cell.data()) > count_char[count_char_index][0]) {
+                count_char[count_char_index][1] = std::string(cell.data());
+              }
+            }
+            count_char_index ++;
+          }
+            break;
+          case INTS:{
+            count[i][0] ++;
+            count[i][1] += *(int*)cell.data();
+            count[i][2] = *(int*)cell.data() < count[i][2] ? *(int*)cell.data() : count[i][2];
+            count[i][3] = *(int*)cell.data() > count[i][3] ? *(int*)cell.data() : count[i][3];
+          }
+            break;
+          case FLOATS:{
+            count[i][0] ++;
+            count[i][1] += *(float*)cell.data();
+            count[i][2] = *(float*)cell.data() < count[i][2] ? *(float*)cell.data() : count[i][2];
+            count[i][3] = *(float*)cell.data() > count[i][3] ? *(float*)cell.data() : count[i][3];
+          }
+            break;
+          case DATES:{
+            count[i][0] ++;
+            count[i][2] = *(int*)cell.data() < count[i][2] ? *(int*)cell.data() : count[i][2];
+            count[i][3] = *(int*)cell.data() > count[i][3] ? *(int*)cell.data() : count[i][3];
+          }
+            break;
+          case UNDEFINED:
+            break;
+        }
+        count_char_index = 0;
+      }
     }
 
-    tuple_to_string(ss, *tuple);
-    ss << std::endl;
-  }
+    std::vector<std::string> names;
+    std::vector<std::string> outs;
+    for (int i = 0; i < select_stmt->aggr_attribute_num(); ++i) {
+      RelAttr relation_attr = select_stmt->get_aggr_attribute(i);
+      switch (relation_attr.aggr_type) {
+        case Count: {
+          names.emplace_back("COUNT");
+          outs.emplace_back(format(count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+        } break;
+        case Avg: {
+          names.emplace_back("AVG");
+          outs.emplace_back(format(count[i][1] / count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+        } break;
+        case Max: {
+          names.emplace_back("MAX");
+          if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
+            outs.emplace_back(count_char[count[i][1]][1]);
+            std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+          } else {
+            outs.emplace_back(format(count[i][3], select_stmt->query_fields()[i].meta()->type() == DATES));
+          }
+        } break;
+        case Min: {
+          names.emplace_back("MIN");
+          if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
+            outs.emplace_back(count_char[count[i][1]][0]);
+            std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+          } else {
+            outs.emplace_back(format(count[i][2], select_stmt->query_fields()[i].meta()->type() == DATES));
+          }
+        } break;
+        case None:
+          break;
+      }
+      names[names.size()-1] += "(";
+      names[names.size()-1] += relation_attr.attribute_name;
+      names[names.size()-1] += ")";
+      std::transform(names[names.size()-1].begin(), names[names.size()-1].end(), names[names.size()-1].begin(), ::toupper);
+    }
+    print_aggr(ss, names);
+    print_aggr(ss, outs);
+  } else {
+    print_tuple_header(ss, project_oper);
+    while ((rc = project_oper.next()) == RC::SUCCESS) {
+      // get current record
+      // write to response
+      Tuple * tuple = project_oper.current_tuple();
+      if (nullptr == tuple) {
+        rc = RC::INTERNAL;
+        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+        break;
+      }
 
+      tuple_to_string(ss, *tuple);
+      ss << std::endl;
+    }
+  }
   if (rc != RC::RECORD_EOF) {
     LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
     project_oper.close();

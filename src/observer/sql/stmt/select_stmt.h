@@ -40,10 +40,15 @@ public:
   const std::vector<Table *> &tables() const { return tables_; }
   const std::vector<Field> &query_fields() const { return query_fields_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
+  RelAttr get_aggr_attribute(int idx) const { return attributes_[idx]; }
+  int aggr_attribute_num() { return aggr_attribute_num_; }
 
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
   FilterStmt *filter_stmt_ = nullptr;
+  // todo: 此时如果是聚合运算，则所有都是聚合；后续如果支持分组则需要再优化
+  RelAttr attributes_[MAX_NUM];
+  int aggr_attribute_num_ = 0;
 };
 

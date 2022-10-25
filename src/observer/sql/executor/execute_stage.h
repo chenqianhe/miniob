@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #ifndef __OBSERVER_SQL_EXECUTE_STAGE_H__
 #define __OBSERVER_SQL_EXECUTE_STAGE_H__
 
+#include "algorithm"
 #include "common/seda/stage.h"
 #include "sql/parser/parse.h"
 #include "rc.h"
@@ -48,6 +49,7 @@ protected:
   RC do_create_unique_index(SQLStageEvent *sql_event);
   RC do_show_tables(SQLStageEvent *sql_event);
   RC do_desc_table(SQLStageEvent *sql_event);
+  static std::string format(double raw_data, bool is_date);
   RC do_select(SQLStageEvent *sql_event);
   RC do_insert(SQLStageEvent *sql_event);
   RC insert_record(Table *table, Trx *trx, Record *record, int value_num, const Value *values);
