@@ -27,7 +27,7 @@ Tuple * PredMutiOperator::current_tuple()
 {
   return children_[0]->current_tuple();
 }
-bool PredMutiOperator:: do_predicate(ProjectTuple &tuple)
+bool PredMutiOperator:: do_predicate(RowTuple &tuple)
 {
   if (filter_stmt_ == nullptr || filter_stmt_->filter_units().empty()) {
     return true;
@@ -81,7 +81,7 @@ bool PredMutiOperator:: do_predicate(ProjectTuple &tuple)
 void PredMutiOperator::get_result(TupleSet *result)
 {
   for(int i = 0;i<tuple_set_->size();i++){
-    ProjectTuple *tuple = (*tuple_set_)[i];
+    RowTuple *tuple = (*tuple_set_)[i];
     if(do_predicate(*tuple)){
       result->add_tuple(tuple);
     }

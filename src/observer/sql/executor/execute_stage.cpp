@@ -612,7 +612,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       }
       LOG_INFO("The result is \n%s",ss1.str().c_str());
     }
-    std::vector<ProjectTuple*> descartesSet = getDescartes(tuple_sets);
+    LOG_INFO("try to get descartes");
+    std::vector<RowTuple*> descartesSet = getDescartes(tuple_sets);
+    LOG_INFO("already get descartes,size is %d",descartesSet.size());
+    LOG_INFO("cell num is %d",descartesSet[0]->cell_num());
     //表间过滤
     TupleSet result;
     PredMutiOperator pred_oper(select_stmt->filter_stmt(),&descartesSet);

@@ -18,7 +18,7 @@ class FilterStmt;
 class PredMutiOperator : public Operator
 {
 public:
-  PredMutiOperator(FilterStmt *filter_stmt,std::vector<ProjectTuple *> *tuple_set)
+  PredMutiOperator(FilterStmt *filter_stmt,std::vector<RowTuple *> *tuple_set)
       : filter_stmt_(filter_stmt),tuple_set_(tuple_set)
   {}
   virtual ~PredMutiOperator() = default;
@@ -27,11 +27,11 @@ public:
   RC next() override;
   RC close() override;
   Tuple * current_tuple() override;
-  bool do_predicate(ProjectTuple &tuple);
+  bool do_predicate(RowTuple &tuple);
   void get_result(TupleSet *result);
 
 private:
   FilterStmt *filter_stmt_ = nullptr;
-  std::vector<ProjectTuple *> *tuple_set_;
+  std::vector<RowTuple *> *tuple_set_;
 };
 #endif  // MINIDB_PRED_MUTITABLE_OPERATOR_H
