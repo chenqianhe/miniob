@@ -583,6 +583,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
       TupleSet *tuple_set = new TupleSet();
       std::stringstream ss1;
+      std::stringstream ss2;
       while ((rc = project_oper->next()) == RC::SUCCESS) {
         // get current record
         // write to response
@@ -594,8 +595,11 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
         }
         tuple_to_string(ss1, *tuple);
         ss1 << std::endl;
-
+        tuple_to_string(ss2, *tuple);
+        ss2 << std::endl;
         tuple_set->add_tuple(tuple);
+        LOG_INFO("add tuple \n%s",ss2.str().c_str());
+        ss2.str("");
       }
       LOG_INFO("The result is \n%s",ss1.str().c_str());
       tuple_sets.push_back(tuple_set);
@@ -616,6 +620,12 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::vector<RowTuple*> descartesSet = getDescartes(tuple_sets);
     LOG_INFO("already get descartes,size is %d",descartesSet.size());
     LOG_INFO("cell num is %d",descartesSet[0]->cell_num());
+    std::stringstream ss2;
+    for(RowTuple *tuple:descartesSet){
+      tuple_to_string(ss2, *tuple);
+      ss2 << std::endl;
+    }
+    LOG_INFO("The result is \n%s",ss2.str().c_str());
     //表间过滤
     TupleSet result;
     PredMutiOperator pred_oper(select_stmt->filter_stmt(),&descartesSet);
