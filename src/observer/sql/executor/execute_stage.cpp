@@ -249,6 +249,25 @@ void print_aggr(std::ostream &os, std::vector<std::string> content)
   os << '\n';
 }
 
+void print_tuple_header(std::ostream &os,TupleSet tuple_set){
+  const int cell_num = tuple_set.tuple_cell_num();
+  const TupleCellSpec *cell_spec = nullptr;
+  for (int i = 0; i < cell_num; i++) {
+    tuple_set.tuples()[0]->cell_spec_at(i, cell_spec);
+    if (i != 0) {
+      os << " | ";
+    }
+
+    if (cell_spec->alias()) {
+      os << cell_spec->alias();
+    }
+  }
+
+  if (cell_num > 0) {
+    os << '\n';
+  }
+}
+
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
   TupleCell cell;
