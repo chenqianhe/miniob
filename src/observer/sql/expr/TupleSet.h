@@ -20,7 +20,7 @@ public:
   int size(){
     return tuple_set_.size();
   }
-  std::vector<Tuple *> tuples(){
+  std::vector<Tuple*> tuples(){
     return tuple_set_;
   }
   Tuple* get(int index){
@@ -31,7 +31,7 @@ public:
 //  }
 
 private:
-  std::vector<Tuple *> tuple_set_;
+  std::vector<Tuple*> tuple_set_;
 };
 
 #endif  // MINIDB_TUPLESET_H

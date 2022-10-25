@@ -253,24 +253,8 @@ void print_aggr(std::ostream &os, std::vector<std::string> content)
   os << '\n';
 }
 
-void print_tuple_header(std::ostream &os,TupleSet tuple_set){
-  const int cell_num = tuple_set.tuple_cell_num();
-  const TupleCellSpec *cell_spec = nullptr;
-  for (int i = 0; i < cell_num; i++) {
-    tuple_set.tuples()[0]->cell_spec_at(i, cell_spec);
-    if (i != 0) {
-      os << " | ";
-    }
 
-    if (cell_spec->alias()) {
-      os << cell_spec->alias();
-    }
-  }
 
-  if (cell_num > 0) {
-    os << '\n';
-  }
-}
 
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
@@ -415,6 +399,131 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
   return oper;
 }
+IndexScanOperator *try_to_create_index_scan_operator_with_table(FilterStmt *filter_stmt,Table *default_table)
+{
+  const std::vector<FilterUnit *> &filter_units = filter_stmt->filter_units();
+  if (filter_units.empty() ) {
+    return nullptr;
+  }
+
+  // 在所有过滤条件中，找到字段与值做比较的条件，然后判断字段是否可以使用索引
+  // 如果是多列索引，这里的处理需要更复杂。
+  // 这里的查找规则是比较简单的，就是尽量找到使用相等比较的索引
+  // 如果没有就找范围比较的，但是直接排除不等比较的索引查询. (你知道为什么?)
+  const FilterUnit *better_filter = nullptr;
+  for (const FilterUnit * filter_unit : filter_units) {
+    if (filter_unit->comp() == NOT_EQUAL) {
+      continue;
+    }
+
+    Expression *left = filter_unit->left();
+    Expression *right = filter_unit->right();
+    if (left->type() == ExprType::FIELD && right->type() == ExprType::VALUE) {
+    } else if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
+      std::swap(left, right);
+    }
+    FieldExpr &left_field_expr = *(FieldExpr *)left;
+    const Field &field = left_field_expr.field();
+    const Table *table = field.table();
+    if(strcmp(default_table->name(),table->name())!=0){
+      continue;
+    }
+    Index *index = table->find_index_by_field(field.field_name());
+    if (index != nullptr) {
+      if (better_filter == nullptr) {
+        better_filter = filter_unit;
+      } else if (filter_unit->comp() == EQUAL_TO) {
+        better_filter = filter_unit;
+        break;
+      }
+    }
+  }
+
+  if (better_filter == nullptr) {
+    return nullptr;
+  }
+
+  Expression *left = better_filter->left();
+  Expression *right = better_filter->right();
+  CompOp comp = better_filter->comp();
+  if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
+    std::swap(left, right);
+    switch (comp) {
+      case EQUAL_TO:    { comp = EQUAL_TO; }    break;
+      case LESS_EQUAL:  { comp = GREAT_THAN; }  break;
+      case NOT_EQUAL:   { comp = NOT_EQUAL; }   break;
+      case LESS_THAN:   { comp = GREAT_EQUAL; } break;
+      case GREAT_EQUAL: { comp = LESS_THAN; }   break;
+      case GREAT_THAN:  { comp = LESS_EQUAL; }  break;
+      default: {
+        LOG_WARN("should not happen");
+      }
+    }
+  }
+
+
+  FieldExpr &left_field_expr = *(FieldExpr *)left;
+  const Field &field = left_field_expr.field();
+  const Table *table = field.table();
+  Index *index = table->find_index_by_field(field.field_name());
+  assert(index != nullptr);
+
+  ValueExpr &right_value_expr = *(ValueExpr *)right;
+  TupleCell value;
+  right_value_expr.get_tuple_cell(value);
+
+  const TupleCell *left_cell = nullptr;
+  const TupleCell *right_cell = nullptr;
+  bool left_inclusive = false;
+  bool right_inclusive = false;
+
+  switch (comp) {
+    case EQUAL_TO: {
+      left_cell = &value;
+      right_cell = &value;
+      left_inclusive = true;
+      right_inclusive = true;
+    } break;
+
+    case LESS_EQUAL: {
+      left_cell = nullptr;
+      left_inclusive = false;
+      right_cell = &value;
+      right_inclusive = true;
+    } break;
+
+    case LESS_THAN: {
+      left_cell = nullptr;
+      left_inclusive = false;
+      right_cell = &value;
+      right_inclusive = false;
+    } break;
+
+    case GREAT_EQUAL: {
+      left_cell = &value;
+      left_inclusive = true;
+      right_cell = nullptr;
+      right_inclusive = false;
+    } break;
+
+    case GREAT_THAN: {
+      left_cell = &value;
+      left_inclusive = false;
+      right_cell = nullptr;
+      right_inclusive = false;
+    } break;
+
+    default: {
+      LOG_WARN("should not happen. comp=%d", comp);
+    } break;
+  }
+
+  IndexScanOperator *oper = new IndexScanOperator(table, index,
+      left_cell, left_inclusive, right_cell, right_inclusive);
+
+  LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
+  return oper;
+}
 
 std::string ExecuteStage::format(double raw_data, bool is_date)
 {
@@ -443,52 +552,74 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   RC rc = RC::SUCCESS;
   if (select_stmt->tables().size() > 1) {
     //对每个表进行表内条件过滤，得到每个表差寻出来的结果（一个tupleset），存储到tuple_sets
-    std::vector<TupleSet> tuple_sets;
+    std::vector<TupleSet*> tuple_sets;
+    std::vector<Operator*> scan_opers;
+    std::vector<PredicateOperator*> pred_opers;
+    std::vector<ProjectOperator*> proj_opers;
     for(Table *table : select_stmt->tables()){
-      Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+      Operator *scan_oper = try_to_create_index_scan_operator_with_table(select_stmt->filter_stmt(),table);
       if (nullptr == scan_oper) {
         scan_oper = new TableScanOperator(table);
       }
-
-      DEFER([&] () {delete scan_oper;});
-
-      PredicateOperator pred_oper(select_stmt->filter_stmt());
-      pred_oper.add_child(scan_oper);
-      ProjectOperator project_oper;
-      project_oper.add_child(&pred_oper);
+      scan_opers.push_back(scan_oper);
+//      DEFER([&] () {delete scan_oper;});
+      PredicateOperator *pred_oper = new PredicateOperator(select_stmt->filter_stmt());
+      pred_oper->add_child(scan_oper);
+      pred_opers.push_back(pred_oper);
+      ProjectOperator *project_oper = new ProjectOperator();
+      project_oper->add_child(pred_oper);
       for (const Field &field : select_stmt->query_fields()) {
-        project_oper.add_projection(field.table(), field.meta());
+        if(strcmp(field.table_name(),table->name())!=0){
+          continue;
+        }
+        project_oper->add_projection(field.table(), field.meta());
       }
-      rc = project_oper.open();
+      proj_opers.push_back(project_oper);
+      rc = project_oper->open();
       if (rc != RC::SUCCESS) {
         LOG_WARN("failed to open operator");
         return rc;
       }
 
-      TupleSet tuple_set;
-      while ((rc = project_oper.next()) == RC::SUCCESS) {
+      TupleSet *tuple_set = new TupleSet();
+      std::stringstream ss1;
+      while ((rc = project_oper->next()) == RC::SUCCESS) {
         // get current record
         // write to response
-        Tuple * tuple = project_oper.current_tuple();
+        Tuple * tuple = project_oper->current_tuple();
         if (nullptr == tuple) {
           rc = RC::INTERNAL;
           LOG_WARN("failed to get current record. rc=%s", strrc(rc));
           break;
         }
-        tuple_set.add_tuple((ProjectTuple *)tuple);
+        tuple_to_string(ss1, *tuple);
+        ss1 << std::endl;
+
+        tuple_set->add_tuple(tuple);
       }
+      LOG_INFO("The result is \n%s",ss1.str().c_str());
       tuple_sets.push_back(tuple_set);
     }
+
     //对得到的tuple_sets求笛卡尔积
-    TupleSet descartesSet = getDescartes(tuple_sets);
+    for(int i = 0;i < tuple_sets.size();i++){
+      std::vector<Tuple *> tuples = tuple_sets[i]->tuples();
+      std::stringstream ss1;
+      for(int j = 0;j < tuples.size();j++){
+        Tuple * tuple = tuples[j];
+        tuple_to_string(ss1, *tuple);
+        ss1 << std::endl;
+      }
+      LOG_INFO("The result is \n%s",ss1.str().c_str());
+    }
+    std::vector<ProjectTuple*> descartesSet = getDescartes(tuple_sets);
     //表间过滤
     TupleSet result;
     PredMutiOperator pred_oper(select_stmt->filter_stmt(),&descartesSet);
     pred_oper.get_result(&result);
     //打印结果
     std::stringstream ss;
-    print_tuple_header(ss, result);
-    for(ProjectTuple *tuple:result.tuples()){
+    for(Tuple *tuple:result.tuples()){
       tuple_to_string(ss, *tuple);
       ss << std::endl;
     }

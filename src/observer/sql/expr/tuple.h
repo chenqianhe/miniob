@@ -148,6 +148,7 @@ public:
     spec = speces_[index];
     return RC::SUCCESS;
   }
+
    void add_cell_spec(TupleCellSpec *spec)
     {
       speces_.push_back(spec);
@@ -157,7 +158,6 @@ public:
       return speces_[i];
 
     }
-
     void remove(int size){
       for(int i = 0; i < size; i++){
         speces_.pop_back();
