@@ -42,7 +42,7 @@ QUOTE            [\'\"]
 {DOT}                 					         RETURN_TOKEN(DOT);
 "*"                   					         RETURN_TOKEN(STAR);
 [Nn][Oo][Tt]                                    RETURN_TOKEN(NOT);
-[Nn][Uu][Ll][Ll]                                RETURN_TOKEN(NULL);
+[Nn][Uu][Ll][Ll]                                RETURN_TOKEN(NULL_);
 [Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]                RETURN_TOKEN(NULL_ABLE);
 [Ee][Xx][Ii][Tt]						             RETURN_TOKEN(EXIT);
 [Hh][Ee][Ll][Pp]                    	   RETURN_TOKEN(HELP);
