@@ -87,11 +87,9 @@ int value_init_date(Value *value, const char *v)
   memcpy(value->data, &dv, sizeof(dv));
   return 0;
 }
-void long_value_init_date(Value *value, int v)
+void value_init_null(Value *value)
 {
-  value->type = DATES;
-  value->data = malloc(sizeof(v));
-  memcpy(value->data, &v, sizeof(v));
+  value->type = NULL_;
 }
 void value_destroy(Value *value)
 {

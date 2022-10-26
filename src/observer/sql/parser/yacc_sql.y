@@ -375,6 +375,8 @@ value:
 		if (check_date) {
 			return 1;
 		}
+	|NULL_ {
+        value_init_null(&CONTEXT->values[CONTEXT->value_length++]);
 	}
     ;
     
