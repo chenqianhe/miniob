@@ -48,7 +48,7 @@ RC TableMeta::init_sys_fields()
     LOG_ERROR("Failed to init trx field. rc = %d:%s", rc, strrc(rc));
     return rc;
   }
-  rc = null_tag_field_meta.init(NullTag::null_tag_field_name(), NullTag::null_tag_type(), 0, NullTag::null_tag_field_len(), false);
+  rc = null_tag_field_meta.init(NullTag::null_tag_field_name(), NullTag::null_tag_type(), 4, NullTag::null_tag_field_len(), false);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to init NullTag field. rc = %d:%s", rc, strrc(rc));
     return rc;
