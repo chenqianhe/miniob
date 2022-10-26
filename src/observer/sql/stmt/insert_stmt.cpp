@@ -57,6 +57,9 @@ RC InsertStmt::create(Db *db, Inserts &inserts, Stmt *&stmt)
       const AttrType field_type = field_meta->type();
       const AttrType value_type = values[value_group_index*field_num+i].type;
       if (field_type != value_type) { // TODO try to convert the value type to field type
+        if (value_type == NULL_ && field_meta->null_able()) {
+          continue;
+        }
         LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
             table_name, field_meta->name(), field_type, value_type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
