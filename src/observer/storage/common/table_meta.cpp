@@ -40,15 +40,22 @@ void TableMeta::swap(TableMeta &other) noexcept
 
 RC TableMeta::init_sys_fields()
 {
-  sys_fields_.reserve(1);
+  sys_fields_.reserve(2);
   FieldMeta field_meta;
+  FieldMeta null_tag_field_meta;
   RC rc = field_meta.init(Trx::trx_field_name(), Trx::trx_field_type(), 0, Trx::trx_field_len(), false);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to init trx field. rc = %d:%s", rc, strrc(rc));
     return rc;
   }
+  rc = null_tag_field_meta.init(NullTag::null_tag_field_name(), NullTag::null_tag_type(), 0, NullTag::null_tag_field_len(), false);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to init NullTag field. rc = %d:%s", rc, strrc(rc));
+    return rc;
+  }
 
   sys_fields_.push_back(field_meta);
+  sys_fields_.push_back(null_tag_field_meta);
   return rc;
 }
 RC TableMeta::init(const char *name, int field_num, const AttrInfo attributes[])
