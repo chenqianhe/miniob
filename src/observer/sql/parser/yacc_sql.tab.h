@@ -109,7 +109,7 @@ extern int yydebug;
     DATE_STR = 310,                /* DATE_STR  */
     STAR = 311,                    /* STAR  */
     NOT = 312,                     /* NOT  */
-    NULL_ = 313,                   /* NULL_  */
+    NULL_TAG = 313,                /* NULL_TAG  */
     NULL_ABLE = 314,               /* NULL_ABLE  */
     STRING_V = 315                 /* STRING_V  */
   };

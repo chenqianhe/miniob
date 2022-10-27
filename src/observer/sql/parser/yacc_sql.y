@@ -128,7 +128,7 @@ ParserContext *get_context(yyscan_t scanner)
 %token <string> DATE_STR
 %token <string> STAR
 %token <string> NOT
-%token <string> NULL_
+%token <string> NULL_TAG
 %token <string> NULL_ABLE
 %token <string> STRING_V
 //非终结符
@@ -306,7 +306,7 @@ attr_def:
 
 not_null_able:
 	/* empty */
-	| NOT NULL_ {}
+	| NOT NULL_TAG {}
 	;
 
 number:
@@ -375,7 +375,8 @@ value:
 		if (check_date) {
 			return 1;
 		}
-	|NULL_ {
+		}
+	|NULL_TAG {
         value_init_null(&CONTEXT->values[CONTEXT->value_length++]);
 	}
     ;
