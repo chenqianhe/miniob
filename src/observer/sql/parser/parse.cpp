@@ -87,11 +87,9 @@ int value_init_date(Value *value, const char *v)
   memcpy(value->data, &dv, sizeof(dv));
   return 0;
 }
-void long_value_init_date(Value *value, int v)
+void value_init_null(Value *value)
 {
-  value->type = DATES;
-  value->data = malloc(sizeof(v));
-  memcpy(value->data, &v, sizeof(v));
+  value->type = NULL_;
 }
 void value_destroy(Value *value)
 {
@@ -132,12 +130,13 @@ void condition_destroy(Condition *condition)
   }
 }
 
-void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length)
+void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int null_able)
 {
   LOG_INFO("init attr: %s", name);
   attr_info->name = strdup(name);
   attr_info->type = type;
   attr_info->length = length;
+  attr_info->null_able = null_able;
 }
 void attr_info_destroy(AttrInfo *attr_info)
 {

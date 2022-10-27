@@ -20,6 +20,12 @@ See the Mulan PSL v2 for more details. */
 void TupleCell::to_string(std::ostream &os) const
 {
   switch (attr_type_) {
+  case NULL_: {
+    os<<'N';
+    os<<'U';
+    os<<'L';
+    os<<'L';
+  } break;
   case DATES:{
     char buf[16] = {0};
     snprintf(buf,sizeof(buf),"%04d-%02d-%02d",*(int *)data_/10000,(*(int *)data_%10000)/100,*(int *)data_%100);
@@ -52,6 +58,9 @@ void TupleCell::to_string(std::ostream &os) const
 
 int TupleCell::compare(const TupleCell &other) const
 {
+  if (other.attr_type_ == NULL_ || this->attr_type_ == NULL_) {
+    return -1;
+  }
   if (this->attr_type_ == other.attr_type_) {
     switch (this->attr_type_) {
     case DATES: return compare_date(this->data_, other.data_);

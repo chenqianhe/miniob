@@ -720,7 +720,7 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
   switch (field->type()) {
     case INTS: {
       if (value->type != INTS) {
-        LOG_ERROR("Field type is not matching");
+        LOG_ERROR("Field type is not matching. Received type: %d", value->type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       rc = delete_record(nullptr,record);
@@ -733,7 +733,7 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
       break;
     case CHARS:{
       if(value->type != CHARS){
-        LOG_ERROR("Field type is not matching");
+        LOG_ERROR("Field type is not matching. Received type: %d", value->type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       rc = delete_record(nullptr,record);
@@ -751,7 +751,7 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
       break;
     case FLOATS:{
       if(value->type != FLOATS){
-        LOG_ERROR("Field type is not matching");
+        LOG_ERROR("Field type is not matching. Received type: %d", value->type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       rc = delete_record(nullptr,record);
@@ -764,8 +764,7 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
       break;
     case DATES:{
       if(value->type != DATES){
-
-        LOG_ERROR("Field type is not matching , type = %d",value->type);
+        LOG_ERROR("Field type is not matching. Received type: %d", value->type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       rc = delete_record(nullptr,record);

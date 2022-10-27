@@ -203,6 +203,7 @@ enum RC {
   NOTADB,           /* File opened that is not a database file */
   NOTICE = 100,     /* Notifications from log() */
   UNIQUE_INDEX_REPEATED_VALUE, /* Same value when unique index  */
+  RECEIVED_NULL_BUT_NOT_NULLABLE, /* Received null but not nullable */
 
   /* buffer pool part */
   BUFFERPOOL_EXIST = (BUFFERPOOL | (RCBufferPool::BP_EXIST << 8)),
