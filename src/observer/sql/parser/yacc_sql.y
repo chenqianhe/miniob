@@ -127,6 +127,9 @@ ParserContext *get_context(yyscan_t scanner)
 %token <string> SSS
 %token <string> DATE_STR
 %token <string> STAR
+%token <string> NOT
+%token <string> NULL_TAG
+%token <string> NULL_ABLE
 %token <string> STRING_V
 //非终结符
 
@@ -255,10 +258,10 @@ attr_def_list:
     ;
     
 attr_def:
-    ID_get type LBRACE number RBRACE 
+    ID_get type LBRACE number RBRACE not_null_able
 		{
 			AttrInfo attribute;
-			attr_info_init(&attribute, CONTEXT->id, $2, $4);
+			attr_info_init(&attribute, CONTEXT->id, $2, $4, 0);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name =(char*)malloc(sizeof(char));
 			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
@@ -266,10 +269,10 @@ attr_def:
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length = $4;
 			CONTEXT->value_length++;
 		}
-    |ID_get type
+    |ID_get type not_null_able
 		{
 			AttrInfo attribute;
-			attr_info_init(&attribute, CONTEXT->id, $2, 4);
+			attr_info_init(&attribute, CONTEXT->id, $2, 4, 0);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
 			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
@@ -277,7 +280,35 @@ attr_def:
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length=4; // default attribute length
 			CONTEXT->value_length++;
 		}
+   |ID_get type LBRACE number RBRACE NULL_ABLE
+		{
+			AttrInfo attribute;
+			attr_info_init(&attribute, CONTEXT->id, $2, $4, 1);
+			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name =(char*)malloc(sizeof(char));
+			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id);
+			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type = $2;
+			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length = $4;
+			CONTEXT->value_length++;
+		}
+     |ID_get type NULL_ABLE
+		{
+			AttrInfo attribute;
+			attr_info_init(&attribute, CONTEXT->id, $2, 4, 1);
+			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
+			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id);
+			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type=$2;
+			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length=4; // default attribute length
+			CONTEXT->value_length++;
+		}
     ;
+
+not_null_able:
+	/* empty */
+	| NOT NULL_TAG {}
+	;
+
 number:
 		NUMBER {$$ = $1;}
 		;
@@ -344,6 +375,9 @@ value:
 		if (check_date) {
 			return 1;
 		}
+		}
+	|NULL_TAG {
+        value_init_null(&CONTEXT->values[CONTEXT->value_length++]);
 	}
     ;
     

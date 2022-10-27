@@ -23,6 +23,7 @@ const static Json::StaticString FIELD_TYPE("type");
 const static Json::StaticString FIELD_OFFSET("offset");
 const static Json::StaticString FIELD_LEN("len");
 const static Json::StaticString FIELD_VISIBLE("visible");
+const static Json::StaticString NULL_ABLE("null_able");
 
 const char *ATTR_TYPE_NAME[] = {"undefined", "chars", "ints", "floats", "dates"};
 
@@ -47,16 +48,16 @@ AttrType attr_type_from_string(const char *s)
 FieldMeta::FieldMeta() : attr_type_(AttrType::UNDEFINED), attr_offset_(-1), attr_len_(0), visible_(false)
 {}
 
-RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible)
+RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int null_able)
 {
   if (common::is_blank(name)) {
     LOG_WARN("Name cannot be empty");
     return RC::INVALID_ARGUMENT;
   }
 
-  if (AttrType::UNDEFINED == attr_type || attr_offset < 0 || attr_len <= 0) {
+  if (AttrType::UNDEFINED == attr_type || attr_offset < 0 || attr_len <= 0 || (null_able != 0 && null_able != 1)) {
     LOG_WARN(
-        "Invalid argument. name=%s, attr_type=%d, attr_offset=%d, attr_len=%d", name, attr_type, attr_offset, attr_len);
+        "Invalid argument. name=%s, attr_type=%d, attr_offset=%d, attr_len=%d, null_able=%d", name, attr_type, attr_offset, attr_len, null_able);
     return RC::INVALID_ARGUMENT;
   }
 
@@ -65,6 +66,7 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
   attr_len_ = attr_len;
   attr_offset_ = attr_offset;
   visible_ = visible;
+  null_able_ = null_able;
 
   LOG_INFO("Init a field with name=%s", name);
   return RC::SUCCESS;
@@ -95,6 +97,11 @@ bool FieldMeta::visible() const
   return visible_;
 }
 
+int FieldMeta::null_able() const
+{
+  return null_able_;
+}
+
 void FieldMeta::desc(std::ostream &os) const
 {
   os << "field name=" << name_ << ", type=" << attr_type_to_string(attr_type_) << ", len=" << attr_len_
@@ -108,6 +115,7 @@ void FieldMeta::to_json(Json::Value &json_value) const
   json_value[FIELD_OFFSET] = attr_offset_;
   json_value[FIELD_LEN] = attr_len_;
   json_value[FIELD_VISIBLE] = visible_;
+  json_value[NULL_ABLE] = null_able_;
 }
 
 RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
@@ -122,6 +130,7 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
   const Json::Value &offset_value = json_value[FIELD_OFFSET];
   const Json::Value &len_value = json_value[FIELD_LEN];
   const Json::Value &visible_value = json_value[FIELD_VISIBLE];
+  const Json::Value &null_able_value = json_value[NULL_ABLE];
 
   if (!name_value.isString()) {
     LOG_ERROR("Field name is not a string. json value=%s", name_value.toStyledString().c_str());
@@ -144,6 +153,10 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
     LOG_ERROR("Visible field is not a bool value. json value=%s", visible_value.toStyledString().c_str());
     return RC::GENERIC_ERROR;
   }
+  if (!null_able_value.isInt()) {
+    LOG_ERROR("Null_able is not an integer. json value=%s", null_able_value.toStyledString().c_str());
+    return RC::GENERIC_ERROR;
+  }
 
   AttrType type = attr_type_from_string(type_value.asCString());
   if (UNDEFINED == type) {
@@ -155,5 +168,6 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
   int offset = offset_value.asInt();
   int len = len_value.asInt();
   bool visible = visible_value.asBool();
-  return field.init(name, type, offset, len, visible);
+  int null_able = null_able_value.asInt();
+  return field.init(name, type, offset, len, visible, null_able);
 }

@@ -108,7 +108,10 @@ extern int yydebug;
     SSS = 309,                     /* SSS  */
     DATE_STR = 310,                /* DATE_STR  */
     STAR = 311,                    /* STAR  */
-    STRING_V = 312                 /* STRING_V  */
+    NOT = 312,                     /* NOT  */
+    NULL_TAG = 313,                /* NULL_TAG  */
+    NULL_ABLE = 314,               /* NULL_ABLE  */
+    STRING_V = 315                 /* STRING_V  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -127,7 +130,7 @@ union YYSTYPE
   float floats;
 	char *position;
 
-#line 131 "yacc_sql.tab.h"
+#line 134 "yacc_sql.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

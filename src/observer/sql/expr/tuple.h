@@ -195,6 +195,23 @@ public:
   {
     speces_.push_back(spec);
   }
+
+  void add(ProjectTuple tuple){
+    int size = tuple.cell_num();
+    for(int i = 0; i < size; i++){
+      this->add_cell_spec(tuple.find_cell_by_index(i));
+    }
+  }
+
+  void remove(ProjectTuple tuple){
+    int size = tuple.cell_num();
+    for(int i = 0; i < size; i++){
+      speces_.pop_back();
+    }
+  }
+  TupleCellSpec* find_cell_by_index(int index){
+    return speces_[index];
+  }
   int cell_num() const override
   {
     return speces_.size();
