@@ -53,8 +53,42 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
     return RC::INVALID_ARGUMENT;
   }
   const Value *value = update_sql.value;
+  Value *value_copy = new Value();
+  switch (value->type) {
+    case UNDEFINED:
+      break;
+    case CHARS:{
+      value_copy->type = CHARS;
+      value_copy->data = strdup((char *)(value->data));
+    }
+      break;
+    case INTS:{
+      value_copy->type = INTS;
+      value_copy->data = malloc(sizeof(int));
+      memcpy(value_copy->data, value->data, sizeof(int));
+    }
+      break;
+    case FLOATS:{
+      value_copy->type = FLOATS;
+      value_copy->data = malloc(sizeof(float));
+      memcpy(value_copy->data, value->data, sizeof(float));
+    }
+      break;
+    case DATES:{
+      value_copy->type = DATES;
+      value_copy->data = malloc(sizeof(int));
+      memcpy(value_copy->data, value->data, sizeof(int));
+    }
+      break;
+    case NULL_:{
+      value_copy->type = NULL_;
+    }
+      break;
+  }
+//  LOG_INFO("UpdateStmt::create RECEIVED STRING: %s, TYPE: %d", (char *)(value->data), value->type);
   //get conditions and create filter
   std::unordered_map<std::string, Table *> table_map;
+//  LOG_INFO("UpdateStmt::create RECEIVED STRING2: %s, TYPE: %d", value->data, value->type);
   table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
   FilterStmt *filter_stmt = nullptr;
   RC rc = FilterStmt::create(db, table, &table_map,
@@ -64,6 +98,6 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
     return rc;
   }
 
-  stmt = new UpdateStmt(table,attribute_name,value,filter_stmt);
+  stmt = new UpdateStmt(table,attribute_name,value_copy,filter_stmt);
   return rc;
 }
