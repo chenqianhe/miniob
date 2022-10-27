@@ -55,8 +55,9 @@ RC UpdateStmt::create(Db *db, const Updates &update_sql, Stmt *&stmt)
   const Value *value = update_sql.value;
   Value *value_copy = new Value();
   switch (value->type) {
-    case UNDEFINED:
-      break;
+    case UNDEFINED:{
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
     case CHARS:{
       value_copy->type = CHARS;
       value_copy->data = strdup((char *)(value->data));
