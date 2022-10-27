@@ -593,11 +593,28 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           LOG_WARN("failed to get current record. rc=%s", strrc(rc));
           break;
         }
-        tuple_to_string(ss1, *tuple);
+        RowTuple *rtuple = new RowTuple();
+        rtuple->set_record(&static_cast<RowTuple&>(*tuple).record());
+        std::vector<FieldMeta> fields;
+        for (const Field &field : select_stmt->query_fields()) {
+          if(strcmp(field.table_name(),table->name())!=0){
+            continue;
+          }
+          fields.push_back(*field.meta());
+        }
+        rtuple->set_schema(table, &fields);
+        ProjectTuple *ptuple = new ProjectTuple();
+        ptuple->set_tuple(rtuple);
+        for(int i = 0;i < fields.size();i++){
+          TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(table, &fields[i]));
+          spec->set_alias(fields[i].name());
+          ptuple->add_cell_spec(spec);
+        }
+        tuple_to_string(ss1, *ptuple);
         ss1 << std::endl;
-        tuple_to_string(ss2, *tuple);
+        tuple_to_string(ss2, *ptuple);
         ss2 << std::endl;
-        tuple_set->add_tuple(tuple);
+        tuple_set->add_tuple(ptuple);
         LOG_INFO("add tuple \n%s",ss2.str().c_str());
         ss2.str("");
       }
