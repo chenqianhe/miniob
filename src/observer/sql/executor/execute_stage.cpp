@@ -582,8 +582,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       }
 
       TupleSet *tuple_set = new TupleSet();
-      std::stringstream ss1;
-      std::stringstream ss2;
+//      std::stringstream ss1;
       while ((rc = project_oper->next()) == RC::SUCCESS) {
         // get current record
         // write to response
@@ -593,46 +592,34 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           LOG_WARN("failed to get current record. rc=%s", strrc(rc));
           break;
         }
+        //拿到深拷贝的tuple
+        ProjectTuple *tmp_proj = static_cast<ProjectTuple*>(tuple);
+        RowTuple *tmp_row = static_cast<RowTuple*>(tmp_proj->tuple());
+        Record tmp_record = tmp_row->record();
+        Record *record = new Record();
+        const char* data = tmp_record.data();
+        const RID rid = tmp_record.rid();
+        record->set_data((char*)data);
+        record->set_rid(rid);
         RowTuple *rtuple = new RowTuple();
-        rtuple->set_record(&static_cast<RowTuple&>(*tuple).record());
-        std::vector<FieldMeta> fields;
+        rtuple->set_record(record);
+        rtuple->set_schema(table,table->table_meta().field_metas());
+        ProjectTuple *ptuple = new ProjectTuple();
+        ptuple->set_tuple(rtuple);
         for (const Field &field : select_stmt->query_fields()) {
           if(strcmp(field.table_name(),table->name())!=0){
             continue;
           }
-          fields.push_back(*field.meta());
-        }
-        rtuple->set_schema(table, &fields);
-        ProjectTuple *ptuple = new ProjectTuple();
-        ptuple->set_tuple(rtuple);
-        for(int i = 0;i < fields.size();i++){
-          TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(table, &fields[i]));
-          spec->set_alias(fields[i].name());
+          TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(field.table(), field.meta()));
+          spec->set_alias(field.table()->name());
           ptuple->add_cell_spec(spec);
         }
-        tuple_to_string(ss1, *ptuple);
-        ss1 << std::endl;
-        tuple_to_string(ss2, *ptuple);
-        ss2 << std::endl;
         tuple_set->add_tuple(ptuple);
-        LOG_INFO("add tuple \n%s",ss2.str().c_str());
-        ss2.str("");
       }
-      LOG_INFO("The result is \n%s",ss1.str().c_str());
       tuple_sets.push_back(tuple_set);
     }
 
     //对得到的tuple_sets求笛卡尔积
-    for(int i = 0;i < tuple_sets.size();i++){
-      std::vector<Tuple *> tuples = tuple_sets[i]->tuples();
-      std::stringstream ss1;
-      for(int j = 0;j < tuples.size();j++){
-        Tuple * tuple = tuples[j];
-        tuple_to_string(ss1, *tuple);
-        ss1 << std::endl;
-      }
-      LOG_INFO("The result is \n%s",ss1.str().c_str());
-    }
     LOG_INFO("try to get descartes");
     std::vector<RowTuple*> descartesSet = getDescartes(tuple_sets);
     LOG_INFO("already get descartes,size is %d",descartesSet.size());
