@@ -242,6 +242,26 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
   }
 }
 
+void print_project_tuple_header(std::ostream &os, const ProjectTuple &tuple)
+{
+  const int cell_num = tuple.cell_num();
+  const TupleCellSpec *cell_spec = nullptr;
+  for (int i = 0; i < cell_num; i++) {
+    tuple.cell_spec_at(i, cell_spec);
+    if (i != 0) {
+      os << " | ";
+    }
+
+    if (cell_spec->alias()) {
+      os << cell_spec->alias();
+    }
+  }
+
+  if (cell_num > 0) {
+    os << '\n';
+  }
+}
+
 void print_aggr(std::ostream &os, std::vector<std::string> content)
 {
   for (int i = 0; i < content.size(); i++) {
@@ -252,9 +272,6 @@ void print_aggr(std::ostream &os, std::vector<std::string> content)
   }
   os << '\n';
 }
-
-
-
 
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
@@ -418,6 +435,9 @@ IndexScanOperator *try_to_create_index_scan_operator_with_table(FilterStmt *filt
 
     Expression *left = filter_unit->left();
     Expression *right = filter_unit->right();
+    if (left->type() == ExprType::FIELD && right->type() == ExprType::FIELD){
+      continue;
+    }
     if (left->type() == ExprType::FIELD && right->type() == ExprType::VALUE) {
     } else if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
       std::swap(left, right);
@@ -582,7 +602,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       }
 
       TupleSet *tuple_set = new TupleSet();
-//      std::stringstream ss1;
       while ((rc = project_oper->next()) == RC::SUCCESS) {
         // get current record
         // write to response
@@ -593,6 +612,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           break;
         }
         //拿到深拷贝的tuple
+
         ProjectTuple *tmp_proj = static_cast<ProjectTuple*>(tuple);
         RowTuple *tmp_row = static_cast<RowTuple*>(tmp_proj->tuple());
         Record tmp_record = tmp_row->record();
@@ -611,10 +631,24 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
             continue;
           }
           TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(field.table(), field.meta()));
-          spec->set_alias(field.table()->name());
+          const char* table_name = field.table_name();
+          const char* field_name = field.field_name();
+          int table_name_len = strlen(table_name);
+          int field_name_len = strlen(field_name);
+          char *alias = new char[table_name_len + field_name_len + 1];
+          for(int i = 0;i < table_name_len;i++){
+            alias[i] = table_name[i];
+          }
+          alias[table_name_len] = '.';
+          for(int i = 0;i < field_name_len ;i++){
+            alias[i+table_name_len+1] = field_name[i];
+          }
+          const char* alias_ = alias;
+          spec->set_alias(alias_);
           ptuple->add_cell_spec(spec);
         }
         tuple_set->add_tuple(ptuple);
+
       }
       tuple_sets.push_back(tuple_set);
     }

@@ -40,7 +40,6 @@ RC PredicateOperator::next()
       LOG_WARN("failed to get tuple from operator");
       break;
     }
-
     if (do_predicate(static_cast<RowTuple &>(*tuple))) {
       return rc;
     }
@@ -66,6 +65,9 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
   }
 
   for (const FilterUnit *filter_unit : filter_stmt_->filter_units()) {
+    if (filter_unit->left()->type() == ExprType::FIELD && filter_unit->right()->type() == ExprType::FIELD){
+      continue;
+    }
     Expression *left_expr = filter_unit->left();
     Expression *right_expr = filter_unit->right();
     CompOp comp = filter_unit->comp();
