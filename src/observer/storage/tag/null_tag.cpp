@@ -20,6 +20,16 @@ int NullTag::null_tag_field_len()
   return sizeof(int);
 }
 
+void *NullTag::get_null_tag() const
+{
+  return (void*)&null_tag_;
+}
+
+void NullTag::set_null_tag_bit(int index)
+{
+  null_tag_[index] = true;
+}
+
 NullTag::NullTag()
 {}
 
