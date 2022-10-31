@@ -227,7 +227,7 @@ void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr
     int right_is_attr, RelAttr *right_attr, Value *right_value);
 void condition_destroy(Condition *condition);
 
-void order_condition_int(OrderCondition *order_condition, const char *relation_name, const char *attribute_name,
+void order_condition_init(OrderCondition *order_condition, const char *relation_name, const char *attribute_name,
     OrderType order_type);
 void order_condition_destroy(OrderCondition *order_condition);
 

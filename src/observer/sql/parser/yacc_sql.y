@@ -538,22 +538,22 @@ order_by_attr:
 order_by:
 	ID asc {
 		OrderCondition order_condition;
-		order_condition_int(&order_condition, NULL, $1, ASC_ORDER);
+		order_condition_init(&order_condition, NULL, $1, ASC_ORDER);
 		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
 	}
 	|ID DESC {
 		OrderCondition order_condition;
-		order_condition_int(&order_condition, NULL, $1, DESC_ORDER);
+		order_condition_init(&order_condition, NULL, $1, DESC_ORDER);
 		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
     }
     |ID DOT ID asc {
 		OrderCondition order_condition;
-		order_condition_int(&order_condition, $1, $3, ASC_ORDER);
+		order_condition_init(&order_condition, $1, $3, ASC_ORDER);
 		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
 	}
 	|ID DOT ID DESC {
 		OrderCondition order_condition;
-		order_condition_int(&order_condition, $1, $3, DESC_ORDER);
+		order_condition_init(&order_condition, $1, $3, DESC_ORDER);
 		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
 	 }
     ;

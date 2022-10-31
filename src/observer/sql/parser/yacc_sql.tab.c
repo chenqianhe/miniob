@@ -1934,7 +1934,7 @@ yyreduce:
 #line 539 "yacc_sql.y"
                {
 		OrderCondition order_condition;
-		order_condition_int(&order_condition, NULL, (yyvsp[-1].string), ASC_ORDER);
+		order_condition_init(&order_condition, NULL, (yyvsp[-1].string), ASC_ORDER);
 		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
 	}
 #line 1941 "yacc_sql.tab.c"
@@ -1944,7 +1944,7 @@ yyreduce:
 #line 544 "yacc_sql.y"
                  {
 		OrderCondition order_condition;
-		order_condition_int(&order_condition, NULL, (yyvsp[-1].string), DESC_ORDER);
+		order_condition_init(&order_condition, NULL, (yyvsp[-1].string), DESC_ORDER);
 		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
     }
 #line 1951 "yacc_sql.tab.c"
@@ -1954,7 +1954,7 @@ yyreduce:
 #line 549 "yacc_sql.y"
                    {
 		OrderCondition order_condition;
-		order_condition_int(&order_condition, (yyvsp[-3].string), (yyvsp[-1].string), ASC_ORDER);
+		order_condition_init(&order_condition, (yyvsp[-3].string), (yyvsp[-1].string), ASC_ORDER);
 		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
 	}
 #line 1961 "yacc_sql.tab.c"
@@ -1964,7 +1964,7 @@ yyreduce:
 #line 554 "yacc_sql.y"
                         {
 		OrderCondition order_condition;
-		order_condition_int(&order_condition, (yyvsp[-3].string), (yyvsp[-1].string), DESC_ORDER);
+		order_condition_init(&order_condition, (yyvsp[-3].string), (yyvsp[-1].string), DESC_ORDER);
 		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
 	 }
 #line 1971 "yacc_sql.tab.c"

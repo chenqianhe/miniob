@@ -133,7 +133,7 @@ void condition_destroy(Condition *condition)
   }
 }
 
-void order_condition_int(OrderCondition *order_condition, const char *relation_name, const char *attribute_name, OrderType order_type)
+void order_condition_init(OrderCondition *order_condition, const char *relation_name, const char *attribute_name, OrderType order_type)
 {
   if (relation_name == nullptr) {
     order_condition->relation_name = nullptr;
@@ -194,7 +194,7 @@ void selects_append_order_conditions(Selects *selects, OrderCondition order_cond
   for (size_t i = 0; i < order_condition_num; i++) {
     selects->order_conditions[i] = order_conditions[i];
   }
-  selects->condition_num = order_condition_num;
+  selects->order_condition_num = order_condition_num;
 }
 
 void selects_destroy(Selects *selects)
