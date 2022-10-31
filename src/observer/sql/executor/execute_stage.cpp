@@ -262,6 +262,22 @@ void print_project_tuple_header(std::ostream &os, const ProjectTuple &tuple)
   }
 }
 
+void print_descarte_tuple_header(std::ostream &os, const ProjectTuple &tuple)
+{
+  const int cell_num = tuple.cell_num();
+  const TupleCellSpec *cell_spec = nullptr;
+  for (int i = 0; i < cell_num; i++) {
+    tuple.cell_spec_at(i, cell_spec);
+    if (i != 0) {
+      os << " | ";
+    }
+
+    if (cell_spec->alias()) {
+      os << cell_spec->alias();
+    }
+  }
+}
+
 void print_aggr(std::ostream &os, std::vector<std::string> content)
 {
   for (int i = 0; i < content.size(); i++) {
@@ -291,6 +307,25 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
       first_field = false;
     }
     cell.to_string(os);
+  }
+}
+
+void print_descartes_tuple_header(std::ostream &os,TupleSet &tupleset){
+  for(int i = 0;i < tupleset.size();i++){
+    Tuple * tuple = tupleset.tuples()[i];
+    print_descarte_tuple_header(os,static_cast<ProjectTuple&>(*tuple));
+  }
+  if(tupleset.size() > 0){
+    os<<'\n';
+  }
+}
+void print_descartes_tuple(std::ostream &os,TupleSet &tupleset){
+  for(int i = 0;i < tupleset.size();i++){
+    Tuple * tuple = tupleset.tuples()[i];
+    tuple_to_string(os,*tuple);
+    if(i !=tupleset.size()-1){
+      os << " | ";
+    }
   }
 }
 
@@ -416,6 +451,7 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
   return oper;
 }
+
 IndexScanOperator *try_to_create_index_scan_operator_with_table(FilterStmt *filter_stmt,Table *default_table)
 {
   const std::vector<FilterUnit *> &filter_units = filter_stmt->filter_units();
@@ -652,28 +688,18 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       }
       tuple_sets.push_back(tuple_set);
     }
-
+    //
     //对得到的tuple_sets求笛卡尔积
     LOG_INFO("try to get descartes");
-    std::vector<RowTuple*> descartesSet = getDescartes(tuple_sets);
-    LOG_INFO("already get descartes,size is %d",descartesSet.size());
-    LOG_INFO("cell num is %d",descartesSet[0]->cell_num());
-    std::stringstream ss2;
-    for(RowTuple *tuple:descartesSet){
-      tuple_to_string(ss2, *tuple);
-      ss2 << std::endl;
-    }
-    LOG_INFO("The result is \n%s",ss2.str().c_str());
-    //表间过滤
-    TupleSet result;
-    PredMutiOperator pred_oper(select_stmt->filter_stmt(),&descartesSet);
-    pred_oper.get_result(&result);
-    //打印结果
+    std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets);
+    LOG_INFO("get descartes,size is %d,num is %d",descartesSet.size(),descartesSet[0]->size());
     std::stringstream ss;
-    for(Tuple *tuple:result.tuples()){
-      tuple_to_string(ss, *tuple);
-      ss << std::endl;
+    print_descartes_tuple_header(ss,*descartesSet[0]);
+    for(TupleSet *tupleset:descartesSet){
+      print_descartes_tuple(ss,*tupleset);
+      ss<<std::endl;
     }
+    LOG_INFO("result is \n%s",ss.str().c_str());
     session_event->set_response(ss.str());
     return rc;
   }

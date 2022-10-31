@@ -84,7 +84,7 @@ bool PredMutiOperator:: do_predicate(RowTuple &tuple)
 void PredMutiOperator::get_result(TupleSet *result)
 {
   for(int i = 0;i<tuple_set_->size();i++){
-    RowTuple *tuple = (*tuple_set_)[i];
+    RowTuple *tuple = static_cast<RowTuple*>((*tuple_set_)[i]->tuple());
     if(do_predicate(*tuple)){
       result->add_tuple(tuple);
     }
