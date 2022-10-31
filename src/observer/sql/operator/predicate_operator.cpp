@@ -40,7 +40,7 @@ RC PredicateOperator::next()
       LOG_WARN("failed to get tuple from operator");
       break;
     }
-    LOG_INFO("do_predicate");
+
     if (do_predicate(static_cast<RowTuple &>(*tuple))) {
       return rc;
     }

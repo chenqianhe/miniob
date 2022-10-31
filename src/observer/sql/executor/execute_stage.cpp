@@ -506,9 +506,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     return rc;
   }
 
-  LOG_INFO("try_to_create_index_scan_operator before");
+
   Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
-  LOG_INFO("try_to_create_index_scan_operator %d", nullptr == scan_oper);
   if (nullptr == scan_oper) {
     scan_oper = new TableScanOperator(select_stmt->tables()[0]);
   }
@@ -520,7 +519,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   std::vector<std::vector<std::string>> count_char;
   std::vector<std::vector<bool>> count_null;
 
-  LOG_INFO("PredicateOperator bofore select_stmt->filter_stmt()");
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
   ProjectOperator project_oper;
@@ -535,13 +533,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       count_char.emplace_back(std::vector<std::string>(2));
     }
   }
-  LOG_INFO("project_oper bofore open");
+
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open operator");
     return rc;
   }
-  LOG_INFO("project_oper bofore opened");
+
   std::stringstream ss;
   if (aggr_mode) {
     while ((rc = project_oper.next()) == RC::SUCCESS) {
@@ -619,8 +617,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       switch (relation_attr.aggr_type) {
         case Count: {
           names.emplace_back("COUNT");
-          LOG_INFO("%s", relation_attr.attribute_name);
-          LOG_INFO("%d", !strcmp(relation_attr.attribute_name, "*"));
           if (!strcmp(relation_attr.attribute_name, "*")) {
             int count_max = 0;
             for(auto c: count) {
@@ -679,7 +675,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     print_aggr(ss, outs);
   } else {
     print_tuple_header(ss, project_oper);
-    LOG_INFO("select project_oper");
     while ((rc = project_oper.next()) == RC::SUCCESS) {
       // get current record
       // write to response

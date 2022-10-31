@@ -118,7 +118,6 @@ public:
     FieldExpr *field_expr = (FieldExpr *)spec->expression();
     const FieldMeta *field_meta = field_expr->field().meta();
     // TODO: 这里是减去系统字段的个数，但是最好不要写死
-    LOG_INFO("%s %d %d %d", field_meta->name(), null_tag_bit[index-2]==1, null_tag_cell->null_tag_to_int(), index);
     if (null_tag_bit[index-2]) {
       cell.set_type(NULL_);
     } else {
@@ -131,7 +130,6 @@ public:
 
   RC find_cell(const Field &field, TupleCell &cell) const override
   {
-    LOG_INFO("find_cell");
     const char *table_name = field.table_name();
     if (0 != strcmp(table_name, table_->name())) {
       return RC::NOTFOUND;
