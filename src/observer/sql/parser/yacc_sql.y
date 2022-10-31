@@ -109,6 +109,10 @@ ParserContext *get_context(yyscan_t scanner)
         LE
         GE
         NE
+        IS
+        NOT
+        NULL_ABLE
+
 
 %union {
   struct _Attr *attr;
@@ -127,9 +131,7 @@ ParserContext *get_context(yyscan_t scanner)
 %token <string> SSS
 %token <string> DATE_STR
 %token <string> STAR
-%token <string> NOT
 %token <string> NULL_TAG
-%token <string> NULL_ABLE
 %token <string> STRING_V
 //非终结符
 
@@ -678,6 +680,8 @@ comOp:
     | LE { CONTEXT->comp = LESS_EQUAL; }
     | GE { CONTEXT->comp = GREAT_EQUAL; }
     | NE { CONTEXT->comp = NOT_EQUAL; }
+    | IS NOT { CONTEXT->comp = IS_NOT_SAME; }
+    | IS { CONTEXT->comp = IS_SAME; }
     ;
 
 load_data:

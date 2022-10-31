@@ -61,7 +61,7 @@ RC InsertStmt::create(Db *db, Inserts &inserts, Stmt *&stmt)
           if (field_meta->null_able()) {
             continue;
           } else {
-            LOG_WARN("field null_able mismatch. table=%s, field=%s, field type=%d, value_type=%d, field null_able=%d",
+            LOG_WARN("Field null_able mismatch. table=%s, field=%s, field type=%d, value_type=%d, field null_able=%d",
                      table_name, field_meta->name(), field_type, value_type, field_meta->null_able());
             return RC::RECEIVED_NULL_BUT_NOT_NULLABLE;
           }

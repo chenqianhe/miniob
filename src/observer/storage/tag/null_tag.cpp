@@ -20,10 +20,17 @@ int NullTag::null_tag_field_len()
   return sizeof(int);
 }
 
-NullTag::NullTag()
-{}
+void *NullTag::get_null_tag() const
+{
+  return (void*)&null_tag_;
+}
 
-NullTag::~NullTag()
-{}
+void NullTag::set_null_tag_bit(int index)
+{
+  null_tag_[index] = true;
+}
 
-
+std::bitset<sizeof(int) * 8> NullTag::convert_null_tag_bitset(int tag)
+{
+  return {static_cast<unsigned long long>(tag)};
+}
