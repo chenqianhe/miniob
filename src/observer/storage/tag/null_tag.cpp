@@ -30,10 +30,7 @@ void NullTag::set_null_tag_bit(int index)
   null_tag_[index] = true;
 }
 
-NullTag::NullTag()
-{}
-
-NullTag::~NullTag()
-{}
-
-
+std::bitset<sizeof(int) * 8> NullTag::convert_null_tag_bitset(int tag)
+{
+  return {static_cast<unsigned long long>(tag)};
+}

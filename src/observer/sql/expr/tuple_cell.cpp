@@ -17,15 +17,16 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "util/comparator.h"
 
-void TupleCell::to_string(std::ostream &os) const
+void TupleCell::to_string(std::ostream &os, int is_null) const
 {
-  switch (attr_type_) {
-  case NULL_: {
+  if (is_null) {
     os<<'N';
     os<<'U';
     os<<'L';
     os<<'L';
-  } break;
+    return ;
+  }
+  switch (attr_type_) {
   case DATES:{
     char buf[16] = {0};
     snprintf(buf,sizeof(buf),"%04d-%02d-%02d",*(int *)data_/10000,(*(int *)data_%10000)/100,*(int *)data_%100);
@@ -80,4 +81,9 @@ int TupleCell::compare(const TupleCell &other) const
   }
   LOG_WARN("not supported");
   return -1; // TODO return rc?
+}
+
+int TupleCell::null_tag_to_int() const
+{
+  return *(int *)data_;
 }

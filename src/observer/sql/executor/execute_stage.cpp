@@ -224,9 +224,10 @@ void end_trx_if_need(Session *session, Trx *trx, bool all_right)
 
 void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
 {
-  const int cell_num = oper.tuple_cell_num();
+  // null_tag不展示
+  const int show_cell_num = oper.tuple_cell_num() - 1;
   const TupleCellSpec *cell_spec = nullptr;
-  for (int i = 0; i < cell_num; i++) {
+  for (int i = 0; i < show_cell_num; i++) {
     oper.tuple_cell_spec_at(i, cell_spec);
     if (i != 0) {
       os << " | ";
@@ -237,7 +238,7 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
     }
   }
 
-  if (cell_num > 0) {
+  if (show_cell_num > 0) {
     os << '\n';
   }
 }
@@ -275,9 +276,15 @@ void print_tuple_header(std::ostream &os,TupleSet tuple_set){
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
   TupleCell cell;
-  RC rc = RC::SUCCESS;
+  TupleCell null_tag_cell;
+  RC rc = tuple.cell_at(tuple.cell_num()-1, null_tag_cell);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to fetch field of null tag cell. index=%d, rc=%s", tuple.cell_num()-1, strrc(rc));
+    return ;
+  }
+  std::bitset<sizeof(int) * 8> null_tag_bit = NullTag::convert_null_tag_bitset(null_tag_cell.null_tag_to_int());
   bool first_field = true;
-  for (int i = 0; i < tuple.cell_num(); i++) {
+  for (int i = 0; i < tuple.cell_num()-1; i++) {
     rc = tuple.cell_at(i, cell);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
@@ -289,7 +296,7 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
     } else {
       first_field = false;
     }
-    cell.to_string(os);
+    cell.to_string(os, null_tag_bit[i]);
   }
 }
 

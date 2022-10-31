@@ -36,6 +36,14 @@ static void wildcard_fields(Table *table, std::vector<Field> &field_metas)
   }
 }
 
+static void insert_null_tag_query(Db *db, std::set<std::string> tables, std::vector<Field> &field_metas)
+{
+  for (const std::basic_string<char>& table_name : tables) {
+    Table *table = db->find_table(table_name.c_str());
+    field_metas.push_back(Field(table, table->table_meta().field(NullTag::null_tag_field_name())));
+  }
+}
+
 RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
 {
   if (nullptr == db) {
@@ -65,6 +73,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
+  std::set<std::string> query_tables;
   bool aggr_flag = false;
   for (int i = select_sql.attr_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.attributes[i];
@@ -73,6 +82,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     }
     if (common::is_blank(relation_attr.relation_name) && 0 == strcmp(relation_attr.attribute_name, "*")) {
       for (Table *table : tables) {
+        query_tables.insert(std::string(table->name()));
         wildcard_fields(table, query_fields);
       }
 
@@ -86,6 +96,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
           return RC::SCHEMA_FIELD_MISSING;
         }
         for (Table *table : tables) {
+          query_tables.insert(std::string(table->name()));
           wildcard_fields(table, query_fields);
         }
       } else {
@@ -97,6 +108,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
 
         Table *table = iter->second;
         if (0 == strcmp(field_name, "*")) {
+          query_tables.insert(std::string(table->name()));
           wildcard_fields(table, query_fields);
         } else {
           const FieldMeta *field_meta = table->table_meta().field(field_name);
@@ -107,6 +119,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
           if (relation_attr.aggr_type == Avg && (field_meta->type() == CHARS || field_meta->type() == DATES)) {
             return RC::MISMATCH;
           }
+          query_tables.insert(std::string(table->name()));
           query_fields.push_back(Field(table, field_meta));
         }
       }
@@ -125,10 +138,11 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
       if (relation_attr.aggr_type == Avg && (field_meta->type() == CHARS || field_meta->type() == DATES)) {
         return RC::MISMATCH;
       }
+      query_tables.insert(std::string(table->name()));
       query_fields.push_back(Field(table, field_meta));
     }
   }
-
+  insert_null_tag_query(db, query_tables, query_fields);
   LOG_INFO("got %d tables in from stmt and %d fields in query stmt", tables.size(), query_fields.size());
 
   Table *default_table = nullptr;

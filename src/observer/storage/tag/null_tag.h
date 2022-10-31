@@ -10,12 +10,13 @@
 
 class NullTag {
 public:
-  NullTag();
-  ~NullTag();
+  NullTag() = default;
+  ~NullTag() = default;
 
   static const char *null_tag_field_name();
   static AttrType null_tag_type();
   static int null_tag_field_len();
+  static std::bitset<sizeof(int) * 8> convert_null_tag_bitset(int tag);
   void *get_null_tag() const;
   void set_null_tag_bit(int index);
 
