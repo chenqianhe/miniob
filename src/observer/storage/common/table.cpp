@@ -366,11 +366,22 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
     return RC::SCHEMA_FIELD_MISSING;
   }
 
+  auto *null_tag = new NullTag();
+  const FieldMeta* null_tag_field = table_meta_.field(NullTag::null_tag_field_name());
+
   const int normal_field_start_index = table_meta_.sys_field_num();
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
     if (field->type() != value.type) {
+      if (field->null_able() && value.type == NULL_) {
+        null_tag->set_null_tag_bit(i);
+        continue;
+      } else {
+        LOG_WARN("Field null_able mismatch. table=%s, field=%s, field type=%d, value_type=%d, field null_able=%d",
+            table_meta_.name(), field->name(), field->type(), value.type, field->null_able());
+        return RC::RECEIVED_NULL_BUT_NOT_NULLABLE;
+      }
       LOG_ERROR("Invalid value type. table name =%s, field name=%s, type=%d, but given=%d",
           table_meta_.name(),
           field->name(),
@@ -383,6 +394,9 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
   // 复制所有字段的值
   int record_size = table_meta_.record_size();
   char *record = new char[record_size];
+
+  // 先设置null_tag
+  memcpy(record + null_tag_field->offset(), null_tag->get_null_tag(), NullTag::null_tag_field_len());
 
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
@@ -720,7 +734,7 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
   switch (field->type()) {
     case INTS: {
       if (value->type != INTS) {
-        LOG_ERROR("Field type is not matching");
+        LOG_ERROR("Field type is not matching. Received type: %d", value->type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       rc = delete_record(nullptr,record);
@@ -733,7 +747,7 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
       break;
     case CHARS:{
       if(value->type != CHARS){
-        LOG_ERROR("Field type is not matching");
+        LOG_ERROR("Field type is not matching. Received type: %d", value->type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       rc = delete_record(nullptr,record);
@@ -751,7 +765,7 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
       break;
     case FLOATS:{
       if(value->type != FLOATS){
-        LOG_ERROR("Field type is not matching");
+        LOG_ERROR("Field type is not matching. Received type: %d", value->type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       rc = delete_record(nullptr,record);
@@ -764,8 +778,7 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
       break;
     case DATES:{
       if(value->type != DATES){
-
-        LOG_ERROR("Field type is not matching , type = %d",value->type);
+        LOG_ERROR("Field type is not matching. Received type: %d", value->type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       rc = delete_record(nullptr,record);

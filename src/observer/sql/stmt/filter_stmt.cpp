@@ -130,7 +130,11 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   filter_unit->set_right(right);
 
   // 检查两个类型是否能够比较
-  if ((left_value_type != right_value_type && (left_value_type == DATES || right_value_type == DATES)) || left_value_type == UNDEFINED || right_value_type == UNDEFINED) {
+  if ((left_value_type != right_value_type &&
+          ((left_value_type == DATES && right_value_type != NULL_) ||
+              ( right_value_type == DATES && left_value_type != NULL_))) ||
+      left_value_type == UNDEFINED ||
+      right_value_type == UNDEFINED) {
     rc = RC::MISMATCH;
   }
   return rc;

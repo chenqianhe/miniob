@@ -224,9 +224,10 @@ void end_trx_if_need(Session *session, Trx *trx, bool all_right)
 
 void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
 {
-  const int cell_num = oper.tuple_cell_num();
+  // null_tag不展示
+  const int show_cell_num = oper.tuple_cell_num() - 1;
   const TupleCellSpec *cell_spec = nullptr;
-  for (int i = 0; i < cell_num; i++) {
+  for (int i = 0; i < show_cell_num; i++) {
     oper.tuple_cell_spec_at(i, cell_spec);
     if (i != 0) {
       os << " | ";
@@ -237,7 +238,7 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
     }
   }
 
-  if (cell_num > 0) {
+  if (show_cell_num > 0) {
     os << '\n';
   }
 }
@@ -292,9 +293,15 @@ void print_aggr(std::ostream &os, std::vector<std::string> content)
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
   TupleCell cell;
-  RC rc = RC::SUCCESS;
+  TupleCell null_tag_cell;
+  RC rc = tuple.cell_at(tuple.cell_num()-1, null_tag_cell);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to fetch field of null tag cell. index=%d, rc=%s", tuple.cell_num()-1, strrc(rc));
+    return ;
+  }
+  std::bitset<sizeof(int) * 8> null_tag_bit = NullTag::convert_null_tag_bitset(null_tag_cell.null_tag_to_int());
   bool first_field = true;
-  for (int i = 0; i < tuple.cell_num(); i++) {
+  for (int i = 0; i < tuple.cell_num()-1; i++) {
     rc = tuple.cell_at(i, cell);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
@@ -306,7 +313,7 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
     } else {
       first_field = false;
     }
-    cell.to_string(os);
+    cell.to_string(os, null_tag_bit[i]);
   }
 }
 
@@ -351,6 +358,8 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
     if (left->type() == ExprType::FIELD && right->type() == ExprType::VALUE) {
     } else if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
       std::swap(left, right);
+    } else if (left->type() == ExprType::VALUE && right->type() == ExprType::VALUE) {
+      continue;
     }
     FieldExpr &left_field_expr = *(FieldExpr *)left;
     const Field &field = left_field_expr.field();
@@ -607,6 +616,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SessionEvent *session_event = sql_event->session_event();
   bool aggr_mode = select_stmt->aggr_attribute_num() > 0;
   RC rc = RC::SUCCESS;
+  LOG_INFO("select_stmt->tables().size() %d", select_stmt->tables().size());
   if (select_stmt->tables().size() > 1) {
     //对每个表进行表内条件过滤，得到每个表差寻出来的结果（一个tupleset），存储到tuple_sets
     std::vector<TupleSet*> tuple_sets;
@@ -706,6 +716,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     return rc;
   }
 
+
   Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
   if (nullptr == scan_oper) {
     scan_oper = new TableScanOperator(select_stmt->tables()[0]);
@@ -716,6 +727,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   // count, avg/idx, min, max
   std::vector<std::vector<double>> count;
   std::vector<std::vector<std::string>> count_char;
+  std::vector<std::vector<bool>> count_null;
 
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
@@ -724,12 +736,14 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   for (const Field &field : select_stmt->query_fields()) {
     project_oper.add_projection(field.table(), field.meta());
     count.emplace_back(std::vector<double>(2, 0));
+    count_null.emplace_back(std::vector<bool>(4, false));
     count[count.size()-1].emplace_back(std::numeric_limits<float>::max());
     count[count.size()-1].emplace_back(std::numeric_limits<float>::lowest());
     if(field.meta()->type() == CHARS) {
       count_char.emplace_back(std::vector<std::string>(2));
     }
   }
+
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open operator");
@@ -749,7 +763,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       TupleCell cell;
       bool first_field = true;
       int count_char_index = 0;
-      for (int i = 0; i < tuple->cell_num(); i++) {
+      // 不统计 __null_tag
+      for (int i = 0; i < tuple->cell_num()-1; i++) {
         rc = tuple->cell_at(i, cell);
         if (rc != RC::SUCCESS) {
           LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
@@ -793,6 +808,11 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
             count[i][3] = *(int*)cell.data() > count[i][3] ? *(int*)cell.data() : count[i][3];
           }
             break;
+          case NULL_: {
+            count_null[i][2] = true;
+            count_null[i][3] = true;
+          }
+            break;
           case UNDEFINED:
             break;
         }
@@ -807,28 +827,50 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       switch (relation_attr.aggr_type) {
         case Count: {
           names.emplace_back("COUNT");
-          outs.emplace_back(format(count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+          if (!strcmp(relation_attr.attribute_name, "*")) {
+            int count_max = 0;
+            for(auto c: count) {
+              if (c[0] > count_max) {
+                count_max = (int)c[0];
+              }
+            }
+            outs.emplace_back(std::to_string(count_max));
+          } else {
+            outs.emplace_back(std::to_string((int)count[i][0]));
+          }
         } break;
         case Avg: {
           names.emplace_back("AVG");
-          outs.emplace_back(format(count[i][1] / count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+          if (count[i][0] == 0) {
+            outs.emplace_back("NULL");
+          } else {
+            outs.emplace_back(format(count[i][1] / count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+          }
         } break;
         case Max: {
           names.emplace_back("MAX");
-          if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
-            outs.emplace_back(count_char[count[i][1]][1]);
-            std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+          if (count_null[i][3]) {
+            outs.emplace_back("NULL");
           } else {
-            outs.emplace_back(format(count[i][3], select_stmt->query_fields()[i].meta()->type() == DATES));
+            if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
+              outs.emplace_back(count_char[count[i][1]][1]);
+              std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+            } else {
+              outs.emplace_back(format(count[i][3], select_stmt->query_fields()[i].meta()->type() == DATES));
+            }
           }
         } break;
         case Min: {
           names.emplace_back("MIN");
-          if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
-            outs.emplace_back(count_char[count[i][1]][0]);
-            std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+          if (count_null[i][2]) {
+            outs.emplace_back("NULL");
           } else {
-            outs.emplace_back(format(count[i][2], select_stmt->query_fields()[i].meta()->type() == DATES));
+            if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
+              outs.emplace_back(count_char[count[i][1]][0]);
+              std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+            } else {
+              outs.emplace_back(format(count[i][2], select_stmt->query_fields()[i].meta()->type() == DATES));
+            }
           }
         } break;
         case None:

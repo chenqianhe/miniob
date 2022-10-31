@@ -22,6 +22,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/field_meta.h"
 #include "storage/common/index_meta.h"
 #include "common/lang/serializable.h"
+#include "storage/tag/null_tag.h"
 
 class TableMeta : public common::Serializable {
 public:
