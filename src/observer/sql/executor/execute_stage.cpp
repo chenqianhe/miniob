@@ -242,6 +242,42 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
   }
 }
 
+void print_project_tuple_header(std::ostream &os, const ProjectTuple &tuple)
+{
+  const int cell_num = tuple.cell_num();
+  const TupleCellSpec *cell_spec = nullptr;
+  for (int i = 0; i < cell_num; i++) {
+    tuple.cell_spec_at(i, cell_spec);
+    if (i != 0) {
+      os << " | ";
+    }
+
+    if (cell_spec->alias()) {
+      os << cell_spec->alias();
+    }
+  }
+
+  if (cell_num > 0) {
+    os << '\n';
+  }
+}
+
+void print_descarte_tuple_header(std::ostream &os, const ProjectTuple &tuple)
+{
+  const int cell_num = tuple.cell_num();
+  const TupleCellSpec *cell_spec = nullptr;
+  for (int i = 0; i < cell_num; i++) {
+    tuple.cell_spec_at(i, cell_spec);
+    if (i != 0) {
+      os << " | ";
+    }
+
+    if (cell_spec->alias()) {
+      os << cell_spec->alias();
+    }
+  }
+}
+
 void print_aggr(std::ostream &os, std::vector<std::string> content)
 {
   for (int i = 0; i < content.size(); i++) {
@@ -252,9 +288,6 @@ void print_aggr(std::ostream &os, std::vector<std::string> content)
   }
   os << '\n';
 }
-
-
-
 
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
@@ -274,6 +307,25 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
       first_field = false;
     }
     cell.to_string(os);
+  }
+}
+
+void print_descartes_tuple_header(std::ostream &os,TupleSet &tupleset){
+  for(int i = 0;i < tupleset.size();i++){
+    Tuple * tuple = tupleset.tuples()[i];
+    print_descarte_tuple_header(os,static_cast<ProjectTuple&>(*tuple));
+  }
+  if(tupleset.size() > 0){
+    os<<'\n';
+  }
+}
+void print_descartes_tuple(std::ostream &os,TupleSet &tupleset){
+  for(int i = 0;i < tupleset.size();i++){
+    Tuple * tuple = tupleset.tuples()[i];
+    tuple_to_string(os,*tuple);
+    if(i !=tupleset.size()-1){
+      os << " | ";
+    }
   }
 }
 
@@ -399,6 +451,7 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
   return oper;
 }
+
 IndexScanOperator *try_to_create_index_scan_operator_with_table(FilterStmt *filter_stmt,Table *default_table)
 {
   const std::vector<FilterUnit *> &filter_units = filter_stmt->filter_units();
@@ -418,6 +471,9 @@ IndexScanOperator *try_to_create_index_scan_operator_with_table(FilterStmt *filt
 
     Expression *left = filter_unit->left();
     Expression *right = filter_unit->right();
+    if (left->type() == ExprType::FIELD && right->type() == ExprType::FIELD){
+      continue;
+    }
     if (left->type() == ExprType::FIELD && right->type() == ExprType::VALUE) {
     } else if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
       std::swap(left, right);
@@ -582,7 +638,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       }
 
       TupleSet *tuple_set = new TupleSet();
-      std::stringstream ss1;
       while ((rc = project_oper->next()) == RC::SUCCESS) {
         // get current record
         // write to response
@@ -592,40 +647,59 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           LOG_WARN("failed to get current record. rc=%s", strrc(rc));
           break;
         }
-        tuple_to_string(ss1, *tuple);
-        ss1 << std::endl;
+        //拿到深拷贝的tuple
 
-        tuple_set->add_tuple(tuple);
+        ProjectTuple *tmp_proj = static_cast<ProjectTuple*>(tuple);
+        RowTuple *tmp_row = static_cast<RowTuple*>(tmp_proj->tuple());
+        Record tmp_record = tmp_row->record();
+        Record *record = new Record();
+        const char* data = tmp_record.data();
+        const RID rid = tmp_record.rid();
+        record->set_data((char*)data);
+        record->set_rid(rid);
+        RowTuple *rtuple = new RowTuple();
+        rtuple->set_record(record);
+        rtuple->set_schema(table,table->table_meta().field_metas());
+        ProjectTuple *ptuple = new ProjectTuple();
+        ptuple->set_tuple(rtuple);
+        for (const Field &field : select_stmt->query_fields()) {
+          if(strcmp(field.table_name(),table->name())!=0){
+            continue;
+          }
+          TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(field.table(), field.meta()));
+          const char* table_name = field.table_name();
+          const char* field_name = field.field_name();
+          int table_name_len = strlen(table_name);
+          int field_name_len = strlen(field_name);
+          char *alias = new char[table_name_len + field_name_len + 1];
+          for(int i = 0;i < table_name_len;i++){
+            alias[i] = table_name[i];
+          }
+          alias[table_name_len] = '.';
+          for(int i = 0;i < field_name_len ;i++){
+            alias[i+table_name_len+1] = field_name[i];
+          }
+          const char* alias_ = alias;
+          spec->set_alias(alias_);
+          ptuple->add_cell_spec(spec);
+        }
+        tuple_set->add_tuple(ptuple);
+
       }
-      LOG_INFO("The result is \n%s",ss1.str().c_str());
       tuple_sets.push_back(tuple_set);
     }
-
+    //
     //对得到的tuple_sets求笛卡尔积
-    for(int i = 0;i < tuple_sets.size();i++){
-      std::vector<Tuple *> tuples = tuple_sets[i]->tuples();
-      std::stringstream ss1;
-      for(int j = 0;j < tuples.size();j++){
-        Tuple * tuple = tuples[j];
-        tuple_to_string(ss1, *tuple);
-        ss1 << std::endl;
-      }
-      LOG_INFO("The result is \n%s",ss1.str().c_str());
-    }
     LOG_INFO("try to get descartes");
-    std::vector<RowTuple*> descartesSet = getDescartes(tuple_sets);
-    LOG_INFO("already get descartes,size is %d",descartesSet.size());
-    LOG_INFO("cell num is %d",descartesSet[0]->cell_num());
-    //表间过滤
-    TupleSet result;
-    PredMutiOperator pred_oper(select_stmt->filter_stmt(),&descartesSet);
-    pred_oper.get_result(&result);
-    //打印结果
+    std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets);
+    LOG_INFO("get descartes,size is %d,num is %d",descartesSet.size(),descartesSet[0]->size());
     std::stringstream ss;
-    for(Tuple *tuple:result.tuples()){
-      tuple_to_string(ss, *tuple);
-      ss << std::endl;
+    print_descartes_tuple_header(ss,*descartesSet[0]);
+    for(TupleSet *tupleset:descartesSet){
+      print_descartes_tuple(ss,*tupleset);
+      ss<<std::endl;
     }
+    LOG_INFO("result is \n%s",ss.str().c_str());
     session_event->set_response(ss.str());
     return rc;
   }

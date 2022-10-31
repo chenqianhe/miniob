@@ -7,7 +7,7 @@
 #include "../sql/expr/tuple.h"
 #include "../sql/expr/TupleSet.h"
 #include <vector>
-void descartesRecursive(std::vector<TupleSet*>& originalList,int posotion,std::vector<RowTuple*>& returnList,RowTuple& line);
-std::vector<RowTuple*> getDescartes(std::vector<TupleSet*>& list);
+void descartesRecursive(std::vector<TupleSet*>& originalList,int posotion,std::vector<TupleSet*>& returnList,TupleSet& line);
+std::vector<TupleSet*> getDescartes(std::vector<TupleSet*>& list);
 
 #endif  // MINIDB_DESCARTES_H

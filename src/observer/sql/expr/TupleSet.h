@@ -17,6 +17,9 @@ public:
   void add_tuple(Tuple *tuple){
     tuple_set_.push_back(tuple);
   }
+  void remove(){
+      tuple_set_.pop_back();
+  }
   int size(){
     return tuple_set_.size();
   }

@@ -50,7 +50,10 @@ Tuple *ProjectOperator::current_tuple()
   tuple_.set_tuple(children_[0]->current_tuple());
   return &tuple_;
 }
-
+//Tuple *ProjectOperator::current_rowtuple()
+//{
+//  return children_[0]->current_tuple();
+//}
 void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta)
 {
   // 对单表来说，展示的(alias) 字段总是字段名称，

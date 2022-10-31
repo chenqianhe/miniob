@@ -239,6 +239,10 @@ public:
     return speces_.size();
   }
 
+  Tuple *tuple(){
+    return tuple_;
+  }
+
   RC cell_at(int index, TupleCell &cell) const override
   {
     if (index < 0 || index >= speces_.size()) {

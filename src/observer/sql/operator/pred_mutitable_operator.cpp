@@ -34,6 +34,9 @@ bool PredMutiOperator:: do_predicate(RowTuple &tuple)
   }
   bool filter_result = false;
   for (const FilterUnit *filter_unit : filter_stmt_->filter_units()) {
+    if (filter_unit->left()->type() == ExprType::FIELD && filter_unit->right()->type() == ExprType::FIELD){
+      continue;
+    }
     Expression *left_expr = filter_unit->left();
     Expression *right_expr = filter_unit->right();
     if (left_expr->type() == ExprType::FIELD && right_expr->type() == ExprType::FIELD){
@@ -81,7 +84,7 @@ bool PredMutiOperator:: do_predicate(RowTuple &tuple)
 void PredMutiOperator::get_result(TupleSet *result)
 {
   for(int i = 0;i<tuple_set_->size();i++){
-    RowTuple *tuple = (*tuple_set_)[i];
+    RowTuple *tuple = static_cast<RowTuple*>((*tuple_set_)[i]->tuple());
     if(do_predicate(*tuple)){
       result->add_tuple(tuple);
     }
