@@ -581,6 +581,7 @@ IndexScanOperator *try_to_create_index_scan_operator_with_table(FilterStmt *filt
   return oper;
 }
 
+
 std::string ExecuteStage::format(double raw_data, bool is_date)
 {
   if (!is_date) {
@@ -690,9 +691,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     }
     //
     //对得到的tuple_sets求笛卡尔积
-    LOG_INFO("try to get descartes");
     std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets);
-    LOG_INFO("get descartes,size is %d,num is %d",descartesSet.size(),descartesSet[0]->size());
+
+    //处理表间查询
+    std::vector<FilterUnit*> tables_filter;
     std::stringstream ss;
     print_descartes_tuple_header(ss,*descartesSet[0]);
     for(TupleSet *tupleset:descartesSet){
