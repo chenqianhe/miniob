@@ -322,6 +322,8 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
     if (left->type() == ExprType::FIELD && right->type() == ExprType::VALUE) {
     } else if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
       std::swap(left, right);
+    } else if (left->type() == ExprType::VALUE && right->type() == ExprType::VALUE) {
+      continue;
     }
     FieldExpr &left_field_expr = *(FieldExpr *)left;
     const Field &field = left_field_expr.field();
@@ -448,6 +450,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SessionEvent *session_event = sql_event->session_event();
   bool aggr_mode = select_stmt->aggr_attribute_num() > 0;
   RC rc = RC::SUCCESS;
+  LOG_INFO("select_stmt->tables().size() %d", select_stmt->tables().size());
   if (select_stmt->tables().size() > 1) {
     //对每个表进行表内条件过滤，得到每个表差寻出来的结果（一个tupleset），存储到tuple_sets
     std::vector<TupleSet> tuple_sets;
@@ -503,7 +506,9 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     return rc;
   }
 
+  LOG_INFO("try_to_create_index_scan_operator before");
   Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
+  LOG_INFO("try_to_create_index_scan_operator %d", nullptr == scan_oper);
   if (nullptr == scan_oper) {
     scan_oper = new TableScanOperator(select_stmt->tables()[0]);
   }
@@ -513,7 +518,9 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   // count, avg/idx, min, max
   std::vector<std::vector<double>> count;
   std::vector<std::vector<std::string>> count_char;
+  std::vector<std::vector<bool>> count_null;
 
+  LOG_INFO("PredicateOperator bofore select_stmt->filter_stmt()");
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
   ProjectOperator project_oper;
@@ -521,18 +528,20 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   for (const Field &field : select_stmt->query_fields()) {
     project_oper.add_projection(field.table(), field.meta());
     count.emplace_back(std::vector<double>(2, 0));
+    count_null.emplace_back(std::vector<bool>(4, false));
     count[count.size()-1].emplace_back(std::numeric_limits<float>::max());
     count[count.size()-1].emplace_back(std::numeric_limits<float>::lowest());
     if(field.meta()->type() == CHARS) {
       count_char.emplace_back(std::vector<std::string>(2));
     }
   }
+  LOG_INFO("project_oper bofore open");
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open operator");
     return rc;
   }
-
+  LOG_INFO("project_oper bofore opened");
   std::stringstream ss;
   if (aggr_mode) {
     while ((rc = project_oper.next()) == RC::SUCCESS) {
@@ -546,7 +555,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       TupleCell cell;
       bool first_field = true;
       int count_char_index = 0;
-      for (int i = 0; i < tuple->cell_num(); i++) {
+      // 不统计 __null_tag
+      for (int i = 0; i < tuple->cell_num()-1; i++) {
         rc = tuple->cell_at(i, cell);
         if (rc != RC::SUCCESS) {
           LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
@@ -590,6 +600,11 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
             count[i][3] = *(int*)cell.data() > count[i][3] ? *(int*)cell.data() : count[i][3];
           }
             break;
+          case NULL_: {
+            count_null[i][2] = true;
+            count_null[i][3] = true;
+          }
+            break;
           case UNDEFINED:
             break;
         }
@@ -604,28 +619,52 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       switch (relation_attr.aggr_type) {
         case Count: {
           names.emplace_back("COUNT");
-          outs.emplace_back(format(count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+          LOG_INFO("%s", relation_attr.attribute_name);
+          LOG_INFO("%d", !strcmp(relation_attr.attribute_name, "*"));
+          if (!strcmp(relation_attr.attribute_name, "*")) {
+            int count_max = 0;
+            for(auto c: count) {
+              if (c[0] > count_max) {
+                count_max = (int)c[0];
+              }
+            }
+            outs.emplace_back(std::to_string(count_max));
+          } else {
+            outs.emplace_back(std::to_string((int)count[i][0]));
+          }
         } break;
         case Avg: {
           names.emplace_back("AVG");
-          outs.emplace_back(format(count[i][1] / count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+          if (count[i][0] == 0) {
+            outs.emplace_back("NULL");
+          } else {
+            outs.emplace_back(format(count[i][1] / count[i][0], select_stmt->query_fields()[i].meta()->type() == DATES));
+          }
         } break;
         case Max: {
           names.emplace_back("MAX");
-          if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
-            outs.emplace_back(count_char[count[i][1]][1]);
-            std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+          if (count_null[i][3]) {
+            outs.emplace_back("NULL");
           } else {
-            outs.emplace_back(format(count[i][3], select_stmt->query_fields()[i].meta()->type() == DATES));
+            if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
+              outs.emplace_back(count_char[count[i][1]][1]);
+              std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+            } else {
+              outs.emplace_back(format(count[i][3], select_stmt->query_fields()[i].meta()->type() == DATES));
+            }
           }
         } break;
         case Min: {
           names.emplace_back("MIN");
-          if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
-            outs.emplace_back(count_char[count[i][1]][0]);
-            std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+          if (count_null[i][2]) {
+            outs.emplace_back("NULL");
           } else {
-            outs.emplace_back(format(count[i][2], select_stmt->query_fields()[i].meta()->type() == DATES));
+            if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
+              outs.emplace_back(count_char[count[i][1]][0]);
+              std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
+            } else {
+              outs.emplace_back(format(count[i][2], select_stmt->query_fields()[i].meta()->type() == DATES));
+            }
           }
         } break;
         case None:
@@ -640,6 +679,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     print_aggr(ss, outs);
   } else {
     print_tuple_header(ss, project_oper);
+    LOG_INFO("select project_oper");
     while ((rc = project_oper.next()) == RC::SUCCESS) {
       // get current record
       // write to response

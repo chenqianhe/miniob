@@ -109,6 +109,7 @@ ParserContext *get_context(yyscan_t scanner)
         LE
         GE
         NE
+        IS
         NOT
         NULL_ABLE
 
@@ -679,6 +680,8 @@ comOp:
     | LE { CONTEXT->comp = LESS_EQUAL; }
     | GE { CONTEXT->comp = GREAT_EQUAL; }
     | NE { CONTEXT->comp = NOT_EQUAL; }
+    | IS NOT { CONTEXT->comp = IS_NOT_SAME; }
+    | IS { CONTEXT->comp = IS_SAME; }
     ;
 
 load_data:

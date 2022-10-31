@@ -111,9 +111,19 @@ public:
     }
 
     const TupleCellSpec *spec = speces_[index];
+    TupleCell *null_tag_cell = new TupleCell();
+    // TODO: 这里偏移是4，但是最好不要写死
+    null_tag_cell->set_data(this->record_->data() + 4);
+    std::bitset<sizeof(int) * 8> null_tag_bit = NullTag::convert_null_tag_bitset(null_tag_cell->null_tag_to_int());
     FieldExpr *field_expr = (FieldExpr *)spec->expression();
     const FieldMeta *field_meta = field_expr->field().meta();
-    cell.set_type(field_meta->type());
+    // TODO: 这里是减去系统字段的个数，但是最好不要写死
+    LOG_INFO("%s %d %d %d", field_meta->name(), null_tag_bit[index-2]==1, null_tag_cell->null_tag_to_int(), index);
+    if (null_tag_bit[index-2]) {
+      cell.set_type(NULL_);
+    } else {
+      cell.set_type(field_meta->type());
+    }
     cell.set_data(this->record_->data() + field_meta->offset());
     cell.set_length(field_meta->len());
     return RC::SUCCESS;
@@ -121,6 +131,7 @@ public:
 
   RC find_cell(const Field &field, TupleCell &cell) const override
   {
+    LOG_INFO("find_cell");
     const char *table_name = field.table_name();
     if (0 != strcmp(table_name, table_->name())) {
       return RC::NOTFOUND;
@@ -131,7 +142,7 @@ public:
       const FieldExpr * field_expr = (const FieldExpr *)speces_[i]->expression();
       const Field &field = field_expr->field();
       if (0 == strcmp(field_name, field.field_name())) {
-	return cell_at(i, cell);
+	    return cell_at(i, cell);
       }
     }
     return RC::NOTFOUND;

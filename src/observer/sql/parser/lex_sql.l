@@ -41,6 +41,7 @@ QUOTE            [\'\"]
 ";"                 	 				           RETURN_TOKEN(SEMICOLON);
 {DOT}                 					         RETURN_TOKEN(DOT);
 "*"                   					         RETURN_TOKEN(STAR);
+[Ii][Ss]               					         RETURN_TOKEN(IS);
 [Nn][Oo][Tt]                                    RETURN_TOKEN(NOT);
 [Nn][Uu][Ll][Ll]                                RETURN_TOKEN(NULL_TAG);
 [Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]                RETURN_TOKEN(NULL_ABLE);
