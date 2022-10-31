@@ -17,8 +17,10 @@ typedef struct ParserContext {
   size_t from_length;
   size_t value_length;
   size_t values_group_num;
+  size_t order_condition_num;
   Value values[MAX_NUM];
   Condition conditions[MAX_NUM];
+  OrderCondition order_conditions[MAX_NUM];
   CompOp comp;
   char id[MAX_NUM];
 } ParserContext;
@@ -44,6 +46,8 @@ void yyerror(yyscan_t scanner, const char *str)
   context->from_length = 0;
   context->select_length = 0;
   context->value_length = 0;
+  context->values_group_num=0;
+  context->order_condition_num = 0;
   context->ssql->sstr.insertion.value_num = 0;
   printf("parse sql failed. error=%s", str);
 }
@@ -112,6 +116,9 @@ ParserContext *get_context(yyscan_t scanner)
         IS
         NOT
         NULL_ABLE
+        ORDER
+        BY
+        ASC
 
 
 %union {
@@ -404,12 +411,14 @@ update:			/*  update 语句的语法解析树*/
 		}
     ;
 select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where SEMICOLON
+    SELECT select_attr FROM ID rel_list where order_by_list SEMICOLON
 		{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 
 			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+
+			selects_append_order_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->order_conditions, CONTEXT->order_condition_num);
 
 			CONTEXT->ssql->flag=SCF_SELECT;//"select";
 			// CONTEXT->ssql->sstr.selection.attr_num = CONTEXT->select_length;
@@ -419,6 +428,7 @@ select:				/*  select 语句的语法解析树*/
 			CONTEXT->from_length=0;
 			CONTEXT->select_length=0;
 			CONTEXT->value_length = 0;
+			CONTEXT->order_condition_num = 0;
 	}
 	;
 
@@ -514,6 +524,45 @@ rel_list:
 				selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
 		  }
     ;
+
+order_by_list:
+	/* empty */
+	|ORDER BY order_by_attr {}
+	;
+
+order_by_attr:
+	order_by {}
+	|order_by COMMA order_by_attr {}
+	;
+
+order_by:
+	ID asc {
+		OrderCondition order_condition;
+		order_condition_int(&order_condition, NULL, $1, ASC_ORDER);
+		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
+	}
+	|ID DESC {
+		OrderCondition order_condition;
+		order_condition_int(&order_condition, NULL, $1, DESC_ORDER);
+		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
+    }
+    |ID DOT ID asc {
+		OrderCondition order_condition;
+		order_condition_int(&order_condition, $1, $3, ASC_ORDER);
+		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
+	}
+	|ID DOT ID DESC {
+		OrderCondition order_condition;
+		order_condition_int(&order_condition, $1, $3, DESC_ORDER);
+		CONTEXT->order_conditions[CONTEXT->order_condition_num++] = order_condition;
+	 }
+    ;
+
+asc:
+	/* empty */
+	|ASC {}
+	;
+
 where:
     /* empty */ 
     | WHERE condition condition_list {	

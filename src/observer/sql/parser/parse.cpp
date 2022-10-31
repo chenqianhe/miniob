@@ -133,6 +133,28 @@ void condition_destroy(Condition *condition)
   }
 }
 
+void order_condition_int(OrderCondition *order_condition, const char *relation_name, const char *attribute_name, OrderType order_type)
+{
+  if (relation_name == nullptr) {
+    order_condition->relation_name = nullptr;
+  } else {
+    order_condition->relation_name = strdup(relation_name);
+  }
+  order_condition->attribute_name = strdup(attribute_name);
+  order_condition->order_type = order_type;
+}
+
+void order_condition_destroy(OrderCondition *order_condition)
+{
+  if (order_condition->relation_name) {
+    free(order_condition->relation_name);
+  }
+  order_condition->relation_name = nullptr;
+  free(order_condition->attribute_name);
+  order_condition->attribute_name = nullptr;
+  order_condition->order_type = NONE_ORDER;
+}
+
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int null_able)
 {
   LOG_INFO("init attr: %s", name);
@@ -166,6 +188,15 @@ void selects_append_conditions(Selects *selects, Condition conditions[], size_t 
   selects->condition_num = condition_num;
 }
 
+void selects_append_order_conditions(Selects *selects, OrderCondition order_conditions[], size_t order_condition_num)
+{
+  assert(order_condition_num <= sizeof(selects->order_conditions) / sizeof(selects->order_conditions[0]));
+  for (size_t i = 0; i < order_condition_num; i++) {
+    selects->order_conditions[i] = order_conditions[i];
+  }
+  selects->condition_num = order_condition_num;
+}
+
 void selects_destroy(Selects *selects)
 {
   for (size_t i = 0; i < selects->attr_num; i++) {
@@ -183,6 +214,11 @@ void selects_destroy(Selects *selects)
     condition_destroy(&selects->conditions[i]);
   }
   selects->condition_num = 0;
+
+  for (size_t i = 0; i < selects->order_condition_num; i++) {
+    order_condition_destroy(&selects->order_conditions[i]);
+  }
+  selects->order_condition_num = 0;
 }
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num, size_t values_group_num)
