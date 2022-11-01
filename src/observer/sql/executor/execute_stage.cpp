@@ -245,9 +245,9 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
 
 void print_project_tuple_header(std::ostream &os, const ProjectTuple &tuple)
 {
-  const int cell_num = tuple.cell_num();
+  const int show_cell_num = tuple.cell_num() - 1;
   const TupleCellSpec *cell_spec = nullptr;
-  for (int i = 0; i < cell_num; i++) {
+  for (int i = 0; i < show_cell_num; i++) {
     tuple.cell_spec_at(i, cell_spec);
     if (i != 0) {
       os << " | ";
@@ -258,26 +258,12 @@ void print_project_tuple_header(std::ostream &os, const ProjectTuple &tuple)
     }
   }
 
-  if (cell_num > 0) {
+  if (show_cell_num > 0) {
     os << '\n';
   }
 }
 
-void print_descarte_tuple_header(std::ostream &os, const ProjectTuple &tuple)
-{
-  const int cell_num = tuple.cell_num();
-  const TupleCellSpec *cell_spec = nullptr;
-  for (int i = 0; i < cell_num; i++) {
-    tuple.cell_spec_at(i, cell_spec);
-    if (i != 0) {
-      os << " | ";
-    }
 
-    if (cell_spec->alias()) {
-      os << cell_spec->alias();
-    }
-  }
-}
 
 void print_aggr(std::ostream &os, std::vector<std::string> content)
 {
@@ -317,10 +303,29 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
   }
 }
 
+void print_descarte_tuple_header(std::ostream &os, const ProjectTuple &tuple)
+{
+  const int show_cell_num = tuple.cell_num() - 1;
+  const TupleCellSpec *cell_spec = nullptr;
+  for (int i = 0; i < show_cell_num; i++) {
+    tuple.cell_spec_at(i, cell_spec);
+    if (i != 0) {
+      os << " | ";
+    }
+
+    if (cell_spec->alias()) {
+      os << cell_spec->alias();
+    }
+  }
+}
+
 void print_descartes_tuple_header(std::ostream &os,TupleSet &tupleset){
   for(int i = 0;i < tupleset.size();i++){
     Tuple * tuple = tupleset.tuples()[i];
     print_descarte_tuple_header(os,static_cast<ProjectTuple&>(*tuple));
+    if(i != tupleset.size() - 1){
+      os << " | ";
+    }
   }
   if(tupleset.size() > 0){
     os<<'\n';
@@ -330,7 +335,7 @@ void print_descartes_tuple(std::ostream &os,TupleSet &tupleset){
   for(int i = 0;i < tupleset.size();i++){
     Tuple * tuple = tupleset.tuples()[i];
     tuple_to_string(os,*tuple);
-    if(i !=tupleset.size()-1){
+    if(i != tupleset.size() - 1){
       os << " | ";
     }
   }
@@ -590,6 +595,91 @@ IndexScanOperator *try_to_create_index_scan_operator_with_table(FilterStmt *filt
   return oper;
 }
 
+bool do_predicate(TupleSet &descarte_tuple,FilterStmt *filter_stmt){
+  if (filter_stmt == nullptr || filter_stmt->filter_units().empty()) {
+    return true;
+  }
+  for (const FilterUnit *filter_unit : filter_stmt->filter_units()) {
+    if (filter_unit->left()->type() != ExprType::FIELD || filter_unit->right()->type() != ExprType::FIELD){
+      continue;
+    }
+    Expression *left_expr = filter_unit->left();
+    Expression *right_expr = filter_unit->right();
+    CompOp comp = filter_unit->comp();
+    TupleCell left_cell;
+    TupleCell right_cell;
+    const char* left_name = static_cast<FieldExpr &>(*left_expr).table_name();
+    const char* right_name = static_cast<FieldExpr &>(*right_expr).table_name();
+    LOG_INFO("left name is %s ,right name is %s",left_name,right_name);
+    Tuple *left_tuple = nullptr;
+    Tuple *right_tuple = nullptr;
+    for(Tuple *tuple:descarte_tuple.tuples()){
+      ProjectTuple *tmp_proj = static_cast<ProjectTuple*>(tuple);
+      RowTuple *tmp = static_cast<RowTuple*>(static_cast<ProjectTuple*>(tuple)->tuple());
+      if(strcmp(left_name,tmp->table_name())==0){
+        left_tuple = tmp_proj->tuple();
+      } else if(strcmp(right_name,tmp->table_name())==0){
+        right_tuple = tmp_proj->tuple();
+      }else{
+        LOG_ERROR("failed to find table");
+      }
+    }
+    if(left_tuple != nullptr && right_tuple != nullptr){
+      LOG_INFO("succeed in getting tuple");
+    }
+    left_expr->get_value(*left_tuple, left_cell);
+    right_expr->get_value(*right_tuple, right_cell);
+    LOG_INFO("succeed in getting value");
+    int compare = -1;
+    bool filter_result = false;
+    if (left_cell.attr_type() != NULL_ && right_cell.attr_type() != NULL_) {
+      compare = left_cell.compare(right_cell);
+      switch (comp) {
+        case IS_SAME:
+        case EQUAL_TO: {
+          filter_result = (0 == compare);
+        } break;
+        case LESS_EQUAL: {
+          filter_result = (compare <= 0);
+        } break;
+        case IS_NOT_SAME:
+        case NOT_EQUAL: {
+          filter_result = (compare != 0);
+        } break;
+        case LESS_THAN: {
+          filter_result = (compare < 0);
+        } break;
+        case GREAT_EQUAL: {
+          filter_result = (compare >= 0);
+        } break;
+        case GREAT_THAN: {
+          filter_result = (compare > 0);
+        } break;
+        default: {
+          LOG_WARN("invalid compare type: %d", comp);
+        } break;
+      }
+    } else {
+      if (left_cell.attr_type() == NULL_ && right_cell.attr_type() == NULL_) {
+        if (comp == IS_SAME) {
+          filter_result = true;
+        } else {
+          filter_result = false;
+        }
+      } else {
+        if (comp == IS_NOT_SAME) {
+          filter_result = true;
+        } else {
+          filter_result = false;
+        }
+      }
+    }
+    if (!filter_result) {
+      return false;
+    }
+  }
+  return true;
+}
 
 std::string ExecuteStage::format(double raw_data, bool is_date)
 {
@@ -616,14 +706,14 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SessionEvent *session_event = sql_event->session_event();
   bool aggr_mode = select_stmt->aggr_attribute_num() > 0;
   RC rc = RC::SUCCESS;
-  LOG_INFO("select_stmt->tables().size() %d", select_stmt->tables().size());
   if (select_stmt->tables().size() > 1) {
     //对每个表进行表内条件过滤，得到每个表差寻出来的结果（一个tupleset），存储到tuple_sets
     std::vector<TupleSet*> tuple_sets;
     std::vector<Operator*> scan_opers;
     std::vector<PredicateOperator*> pred_opers;
     std::vector<ProjectOperator*> proj_opers;
-    for(Table *table : select_stmt->tables()){
+    for(int index = select_stmt->tables().size() -1;index >= 0;index--){
+      Table *table = select_stmt->tables()[index];
       Operator *scan_oper = try_to_create_index_scan_operator_with_table(select_stmt->filter_stmt(),table);
       if (nullptr == scan_oper) {
         scan_oper = new TableScanOperator(table);
@@ -649,6 +739,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       }
 
       TupleSet *tuple_set = new TupleSet();
+      std::stringstream ss1;
       while ((rc = project_oper->next()) == RC::SUCCESS) {
         // get current record
         // write to response
@@ -695,22 +786,54 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           ptuple->add_cell_spec(spec);
         }
         tuple_set->add_tuple(ptuple);
-
+        tuple_to_string(ss1,*ptuple);
       }
+      LOG_INFO("result is \n%s",ss1.str().c_str());
       tuple_sets.push_back(tuple_set);
     }
-    //
-    //对得到的tuple_sets求笛卡尔积
-    std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets);
-
-    //处理表间查询
-    std::vector<FilterUnit*> tables_filter;
-    std::stringstream ss;
-    print_descartes_tuple_header(ss,*descartesSet[0]);
-    for(TupleSet *tupleset:descartesSet){
-      print_descartes_tuple(ss,*tupleset);
-      ss<<std::endl;
+    bool is_empty = false;
+    for(TupleSet *tuple_set:tuple_sets){
+      if(tuple_set->size() == 0){
+        is_empty = true;
+      }
     }
+
+    std::stringstream ss;
+    if(!is_empty){
+      //对得到的tuple_sets求笛卡尔积
+      std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets);
+      //处理表间查询
+      std::vector<FilterUnit*> tables_filter;
+      print_descartes_tuple_header(ss,*descartesSet[0]);
+      for(TupleSet *tupleset:descartesSet){
+        if(do_predicate(*tupleset,select_stmt->filter_stmt())){
+          print_descartes_tuple(ss,*tupleset);
+          ss<<std::endl;
+        }
+
+      }
+    }else{
+      for(int i = 0;i < select_stmt->query_fields().size();i++){
+        const Field &field = select_stmt->query_fields()[i];
+        const char* table_name = field.table_name();
+        const char* field_name = field.field_name();
+        int table_name_len = strlen(table_name);
+        int field_name_len = strlen(field_name);
+        char *alias = new char[table_name_len + field_name_len + 1];
+        for(int i = 0;i < table_name_len;i++){
+          alias[i] = table_name[i];
+        }
+        alias[table_name_len] = '.';
+        for(int i = 0;i < field_name_len ;i++){
+          alias[i+table_name_len+1] = field_name[i];
+        }
+        ss<<alias;
+        if(i != select_stmt->query_fields().size() - 1){
+          ss<<' | ';
+        }
+      }
+    }
+
     LOG_INFO("result is \n%s",ss.str().c_str());
     session_event->set_response(ss.str());
     return rc;
