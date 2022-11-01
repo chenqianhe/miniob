@@ -27,8 +27,6 @@ std::vector<TupleSet*> getDescartes(std::vector<TupleSet*>& list){
   std::vector<TupleSet*> returnList;
   TupleSet *line = new TupleSet();
   descartesRecursive(list,0,returnList,*line);
-  LOG_INFO("descartesRecursive finished,number of tuple is %d",returnList.size());
-  LOG_INFO("descartesRecursive finished,size of tuple is %d",returnList[0]->size());
   delete line;
   return returnList;
 }

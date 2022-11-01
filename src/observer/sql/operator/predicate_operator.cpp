@@ -66,7 +66,6 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
 
   for (const FilterUnit *filter_unit : filter_stmt_->filter_units()) {
     if (filter_unit->left()->type() == ExprType::FIELD && filter_unit->right()->type() == ExprType::FIELD){
-      LOG_INFO("this is a tables condition");
       continue;
     }
     Expression *left_expr = filter_unit->left();

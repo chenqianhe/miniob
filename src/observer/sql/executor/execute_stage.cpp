@@ -323,7 +323,7 @@ void print_descartes_tuple_header(std::ostream &os,TupleSet &tupleset){
   for(int i = 0;i < tupleset.size();i++){
     Tuple * tuple = tupleset.tuples()[i];
     print_descarte_tuple_header(os,static_cast<ProjectTuple&>(*tuple));
-    if(i != tupleset.size() - 1){
+    if(i != tupleset.size() - 1 && tuple->cell_num() > 1){
       os << " | ";
     }
   }
@@ -335,7 +335,7 @@ void print_descartes_tuple(std::ostream &os,TupleSet &tupleset){
   for(int i = 0;i < tupleset.size();i++){
     Tuple * tuple = tupleset.tuples()[i];
     tuple_to_string(os,*tuple);
-    if(i != tupleset.size() - 1){
+    if(i != tupleset.size() - 1 && tuple->cell_num() > 1){
       os << " | ";
     }
   }
@@ -610,7 +610,7 @@ bool do_predicate(TupleSet &descarte_tuple,FilterStmt *filter_stmt){
     TupleCell right_cell;
     const char* left_name = static_cast<FieldExpr &>(*left_expr).table_name();
     const char* right_name = static_cast<FieldExpr &>(*right_expr).table_name();
-    LOG_INFO("left name is %s ,right name is %s",left_name,right_name);
+//    LOG_INFO("left name is %s ,right name is %s",left_name,right_name);
     Tuple *left_tuple = nullptr;
     Tuple *right_tuple = nullptr;
     for(Tuple *tuple:descarte_tuple.tuples()){
@@ -621,15 +621,13 @@ bool do_predicate(TupleSet &descarte_tuple,FilterStmt *filter_stmt){
       } else if(strcmp(right_name,tmp->table_name())==0){
         right_tuple = tmp_proj->tuple();
       }else{
-        LOG_ERROR("failed to find table");
+//        LOG_ERROR("failed to find table");
       }
     }
     if(left_tuple != nullptr && right_tuple != nullptr){
-      LOG_INFO("succeed in getting tuple");
     }
     left_expr->get_value(*left_tuple, left_cell);
     right_expr->get_value(*right_tuple, right_cell);
-    LOG_INFO("succeed in getting value");
     int compare = -1;
     bool filter_result = false;
     if (left_cell.attr_type() != NULL_ && right_cell.attr_type() != NULL_) {
@@ -739,7 +737,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       }
 
       TupleSet *tuple_set = new TupleSet();
-      std::stringstream ss1;
       while ((rc = project_oper->next()) == RC::SUCCESS) {
         // get current record
         // write to response
@@ -786,9 +783,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           ptuple->add_cell_spec(spec);
         }
         tuple_set->add_tuple(ptuple);
-        tuple_to_string(ss1,*ptuple);
       }
-      LOG_INFO("result is \n%s",ss1.str().c_str());
       tuple_sets.push_back(tuple_set);
     }
     bool is_empty = false;
@@ -813,7 +808,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
       }
     }else{
-      for(int i = 0;i < select_stmt->query_fields().size();i++){
+      for(int i = 0;i < select_stmt->query_fields().size() - select_stmt->tables().size();i++){
         const Field &field = select_stmt->query_fields()[i];
         const char* table_name = field.table_name();
         const char* field_name = field.field_name();
@@ -828,13 +823,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           alias[i+table_name_len+1] = field_name[i];
         }
         ss<<alias;
-        if(i != select_stmt->query_fields().size() - 1){
-          ss<<' | ';
+        if(i != select_stmt->query_fields().size()- select_stmt->tables().size() - 1){
+          ss<<" | ";
         }
       }
-    }
+      ss<<std::endl;
 
-    LOG_INFO("result is \n%s",ss.str().c_str());
+    }
     session_event->set_response(ss.str());
     return rc;
   }
