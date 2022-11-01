@@ -50,6 +50,12 @@ typedef enum {
   NO_OP
 } CompOp;
 
+typedef enum {
+  NONE_ORDER,
+  ASC_ORDER,
+  DESC_ORDER
+} OrderType;
+
 //属性值类型
 typedef enum
 {
@@ -79,6 +85,12 @@ typedef struct _Condition {
   Value right_value;   // right-hand side value if right_is_attr = FALSE
 } Condition;
 
+typedef struct _OrderCondition {
+  char *relation_name;   // Relation name
+  char *attribute_name;  // Attribute name
+  OrderType order_type;  // Order type
+} OrderCondition;
+
 // struct of select
 typedef struct {
   size_t attr_num;                // Length of attrs in Select clause
@@ -87,6 +99,8 @@ typedef struct {
   char *relations[MAX_NUM];       // relations in From clause
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
+  size_t order_condition_num;     // Length of conditions in Order clause
+  OrderCondition order_conditions[MAX_NUM];  // conditions in Order clause
 } Selects;
 
 // struct of insert
@@ -213,6 +227,10 @@ void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr
     int right_is_attr, RelAttr *right_attr, Value *right_value);
 void condition_destroy(Condition *condition);
 
+void order_condition_init(OrderCondition *order_condition, const char *relation_name, const char *attribute_name,
+    OrderType order_type);
+void order_condition_destroy(OrderCondition *order_condition);
+
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int null_able);
 void attr_info_destroy(AttrInfo *attr_info);
 
@@ -220,6 +238,7 @@ void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
+void selects_append_order_conditions(Selects *selects, OrderCondition order_conditions[], size_t order_condition_num);
 void selects_destroy(Selects *selects);
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num, size_t values_group_num);
