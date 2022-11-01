@@ -74,10 +74,12 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     } else if (left_expr->type() == ExprType::VALUE && right_expr->type() == ExprType::FIELD) {
       std::swap(left_expr, right_expr);
     }
-    const char* default_table_name = tuple.table_name();
-    const char* current_table_name = static_cast<FieldExpr *>(left_expr)->table_name();
-    if(strcmp(default_table_name,current_table_name) != 0){
-      continue;
+    if (left_expr->type() == ExprType::FIELD) {
+      const char* default_table_name = tuple.table_name();
+      const char* current_table_name = static_cast<FieldExpr *>(left_expr)->table_name();
+      if(strcmp(default_table_name,current_table_name) != 0){
+        continue;
+      }
     }
     CompOp comp = filter_unit->comp();
     TupleCell left_cell;
