@@ -615,6 +615,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   Printer printer = Printer();
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
+  bool order_by = select_stmt->order_condition_num() > 0;
   bool aggr_mode = select_stmt->aggr_attribute_num() > 0;
   RC rc = RC::SUCCESS;
   LOG_INFO("select_stmt->tables().size() %d", select_stmt->tables().size());
@@ -912,6 +913,9 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     }
   }
   printer.print_headers(ss);
+  if (order_by) {
+    printer.sort_contents(select_stmt->order_condition_num(), select_stmt->get_order_conditions());
+  }
   printer.print_contents(ss);
   if (rc != RC::RECORD_EOF) {
     LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));

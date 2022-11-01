@@ -4,6 +4,7 @@
 
 #ifndef MINIDB_PRINTER_H
 #define MINIDB_PRINTER_H
+#include <algorithm>
 #include <sstream>
 #include "vector"
 #include "string"
@@ -22,7 +23,7 @@ public:
   void insert_value(Value value) { contents_[contents_.size()-1].emplace_back(value); };
   void print_headers(std::ostream &os);
   void print_contents(std::ostream &os);
-  void sort_contents(int order_condition_num, OrderCondition oder_conditions[]);
+  void sort_contents(int order_condition_num, OrderCondition order_conditions[]);
 
   void clear() {
     column_names_.clear();
