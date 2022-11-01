@@ -48,6 +48,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/trx/trx.h"
 #include "sql/expr/TupleSet.h"
 #include "../../util/descartes.h"
+#include "printer.h"
 
 using namespace common;
 
@@ -611,6 +612,7 @@ std::string ExecuteStage::format(double raw_data, bool is_date)
 
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
+  Printer printer = Printer();
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
   bool aggr_mode = select_stmt->aggr_attribute_num() > 0;
@@ -732,6 +734,9 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
+    if (field.meta()->name() != std::string(NullTag::null_tag_field_name())) {
+      printer.insert_column_name(field.meta()->name());
+    }
     project_oper.add_projection(field.table(), field.meta());
     count.emplace_back(std::vector<double>(2, 0));
     count_null.emplace_back(std::vector<bool>(4, false));
@@ -852,7 +857,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           } else {
             if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
               outs.emplace_back(count_char[count[i][1]][1]);
-              std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
             } else {
               outs.emplace_back(format(count[i][3], select_stmt->query_fields()[i].meta()->type() == DATES));
             }
@@ -865,7 +869,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           } else {
             if (select_stmt->query_fields()[i].meta()->type() == CHARS) {
               outs.emplace_back(count_char[count[i][1]][0]);
-              std::transform(outs[outs.size()-1].begin(), outs[outs.size()-1].end(), outs[outs.size()-1].begin(), ::toupper);
             } else {
               outs.emplace_back(format(count[i][2], select_stmt->query_fields()[i].meta()->type() == DATES));
             }
@@ -877,13 +880,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       names[names.size()-1] += "(";
       names[names.size()-1] += relation_attr.attribute_name;
       names[names.size()-1] += ")";
-      std::transform(names[names.size()-1].begin(), names[names.size()-1].end(), names[names.size()-1].begin(), ::toupper);
     }
     print_aggr(ss, names);
     print_aggr(ss, outs);
   } else {
-    print_tuple_header(ss, project_oper);
+    printer.print_headers(ss);
     while ((rc = project_oper.next()) == RC::SUCCESS) {
+      printer.expand_rows();
       // get current record
       // write to response
       Tuple * tuple = project_oper.current_tuple();
@@ -892,10 +895,9 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
         LOG_WARN("failed to get current record. rc=%s", strrc(rc));
         break;
       }
-
-      tuple_to_string(ss, *tuple);
-      ss << std::endl;
+      printer.insert_value_from_tuple(*tuple);
     }
+    printer.print_contents(ss);
   }
   if (rc != RC::RECORD_EOF) {
     LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
