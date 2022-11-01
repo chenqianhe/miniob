@@ -163,17 +163,10 @@ public:
       speces_.push_back(spec);
   //    LOG_INFO("add cell spec success");
     }
-    TupleCellSpec *get(int i){
-      return speces_[i];
 
+    const char* table_name() const{
+        return table_->name();
     }
-    void remove(int size){
-      for(int i = 0; i < size; i++){
-        speces_.pop_back();
-      }
-    }
-
-
   Record &record()
   {
     return *record_;
@@ -224,16 +217,7 @@ public:
 //    LOG_INFO("add cell spec success");
   }
 
-  TupleCellSpec *get(int i){
-    return speces_[i];
 
-  }
-
-  void remove(int size){
-    for(int i = 0; i < size; i++){
-      speces_.pop_back();
-    }
-  }
   TupleCellSpec* find_cell_by_index(int index){
     return speces_[index];
   }
@@ -244,9 +228,6 @@ public:
     return speces_.size();
   }
 
-  int tuple_size(){
-    return speces_.size();
-  }
 
   Tuple *tuple(){
     return tuple_;
