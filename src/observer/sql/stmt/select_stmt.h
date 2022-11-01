@@ -43,7 +43,7 @@ public:
   RelAttr get_aggr_attribute(int idx) const { return attributes_[idx]; }
   int aggr_attribute_num() { return aggr_attribute_num_; }
   int order_condition_num() { return order_condition_num_; }
-  OrderCondition get_order_condition(int idx) { return order_conditions_[idx]; }
+  _OrderCondition *get_order_conditions() { return order_conditions_; }
 
 private:
   std::vector<Field> query_fields_;

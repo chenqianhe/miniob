@@ -3,7 +3,7 @@
 //
 
 #include "printer.h"
-
+const double epsilon = 1E-6;
 
 void Printer::insert_value_from_tuple(const Tuple &tuple)
 {
@@ -95,7 +95,61 @@ void Printer::print_contents(std::ostream &os)
   }
 }
 
-void Printer::sort_contents(int order_condition_num, OrderCondition oder_conditions[])
+void Printer::sort_contents(int order_condition_num, OrderCondition order_conditions[])
 {
-
+  std::map<std::string, int> column_name_to_index;
+  for (int i = 0; i < column_names_.size(); i++) {
+    column_name_to_index[column_names_[i]] = i;
+  }
+  std::sort(contents_.begin(),
+      contents_.end(),
+      [column_name_to_index, order_condition_num, order_conditions](std::vector<Value> &a, std::vector<Value> &b) {
+        for (int i = 0; i < order_condition_num; i++) {
+          std::string cmp_column_name;
+          OrderType order_type = order_conditions[i].order_type;
+          if (order_conditions[i].relation_name) {
+            cmp_column_name += std::string(order_conditions[i].relation_name);
+            cmp_column_name += ".";
+          }
+          cmp_column_name += std::string(order_conditions[i].attribute_name);
+          int order_index = column_name_to_index.find(cmp_column_name)->second;
+          float cmp_res = 0;
+          switch (a[order_index].type) {
+            case DATES:
+            case INTS: {
+              cmp_res = *(int*)a[order_index].data - *(int*)b[order_index].data;
+            } break ;
+            case FLOATS: {
+              float res = *(float*)a[order_index].data - *(float*)b[order_index].data;
+              if (res > epsilon) {
+                cmp_res = 1;
+              } else if (res < -epsilon) {
+                cmp_res = -1;
+              } else {
+                cmp_res = 0;
+              }
+            } break ;
+            case CHARS: {
+              cmp_res = strcmp((char*)a[order_index].data, (char*)b[order_index].data);
+            } break ;
+            case NULL_: {
+              cmp_res = 1;
+            } break ;
+          }
+          if (order_type == DESC_ORDER) {
+            if (cmp_res > 0) {
+              return true;
+            } else if (cmp_res < 0) {
+              return false;
+            }
+          } else {
+            if (cmp_res > 0) {
+              return false;
+            } else if (cmp_res < 0) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
 }
