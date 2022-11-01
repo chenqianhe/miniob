@@ -45,6 +45,9 @@ QUOTE            [\'\"]
 [Nn][Oo][Tt]                                    RETURN_TOKEN(NOT);
 [Nn][Uu][Ll][Ll]                                RETURN_TOKEN(NULL_TAG);
 [Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]                RETURN_TOKEN(NULL_ABLE);
+[Oo][Rr][Dd][Ee][Rr]                            RETURN_TOKEN(ORDER);
+[Bb][Yy]                                       RETURN_TOKEN(BY);
+[Aa][Ss][Cc]                                   RETURN_TOKEN(ASC);
 [Ee][Xx][Ii][Tt]						             RETURN_TOKEN(EXIT);
 [Hh][Ee][Ll][Pp]                    	   RETURN_TOKEN(HELP);
 [Dd][Ee][Ss][Cc]                         RETURN_TOKEN(DESC);
