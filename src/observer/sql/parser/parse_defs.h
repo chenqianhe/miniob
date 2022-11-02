@@ -91,6 +91,11 @@ typedef struct _OrderCondition {
   OrderType order_type;  // Order type
 } OrderCondition;
 
+typedef struct _GroupCondition {
+  char *relation_name;   // Relation name
+  char *attribute_name;  // Attribute name
+} GroupCondition;
+
 // struct of select
 typedef struct {
   size_t attr_num;                // Length of attrs in Select clause
@@ -100,7 +105,9 @@ typedef struct {
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
   size_t order_condition_num;     // Length of conditions in Order clause
+  size_t group_condition_num;     // Length of conditions in Group clause
   OrderCondition order_conditions[MAX_NUM];  // conditions in Order clause
+  GroupCondition group_conditions[MAX_NUM]; // conditions in Group clause
 } Selects;
 
 // struct of insert
@@ -231,6 +238,9 @@ void order_condition_init(OrderCondition *order_condition, const char *relation_
     OrderType order_type);
 void order_condition_destroy(OrderCondition *order_condition);
 
+void group_condition_init(GroupCondition *group_condition, const char *relation_name, const char *attribute_name);
+void group_condition_destroy(GroupCondition *group_condition);
+
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int null_able);
 void attr_info_destroy(AttrInfo *attr_info);
 
@@ -239,6 +249,7 @@ void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_append_order_conditions(Selects *selects, OrderCondition order_conditions[], size_t order_condition_num);
+void selects_append_group_conditions(Selects *selects, GroupCondition group_conditions[], size_t group_condition_num);
 void selects_destroy(Selects *selects);
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num, size_t values_group_num);

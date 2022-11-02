@@ -155,6 +155,26 @@ void order_condition_destroy(OrderCondition *order_condition)
   order_condition->order_type = NONE_ORDER;
 }
 
+void group_condition_init(GroupCondition *group_condition, const char *relation_name, const char *attribute_name)
+{
+  if (relation_name == nullptr) {
+    group_condition->relation_name = nullptr;
+  } else {
+    group_condition->relation_name = strdup(relation_name);
+  }
+  group_condition->attribute_name = strdup(attribute_name);
+}
+
+void group_condition_destroy(GroupCondition *group_condition)
+{
+  if (group_condition->relation_name) {
+    free(group_condition->relation_name);
+  }
+  group_condition->relation_name = nullptr;
+  free(group_condition->attribute_name);
+  group_condition->attribute_name = nullptr;
+}
+
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int null_able)
 {
   LOG_INFO("init attr: %s", name);
@@ -197,6 +217,15 @@ void selects_append_order_conditions(Selects *selects, OrderCondition order_cond
   selects->order_condition_num = order_condition_num;
 }
 
+void selects_append_group_conditions(Selects *selects, GroupCondition group_conditions[], size_t group_condition_num)
+{
+  assert(group_condition_num <= sizeof(selects->group_conditions) / sizeof(selects->group_conditions[0]));
+  for (size_t i = 0; i < group_condition_num; i++) {
+    selects->group_conditions[i] = group_conditions[i];
+  }
+  selects->group_condition_num = group_condition_num;
+}
+
 void selects_destroy(Selects *selects)
 {
   for (size_t i = 0; i < selects->attr_num; i++) {
@@ -219,6 +248,11 @@ void selects_destroy(Selects *selects)
     order_condition_destroy(&selects->order_conditions[i]);
   }
   selects->order_condition_num = 0;
+
+  for (size_t i = 0; i < selects->group_condition_num; i++) {
+    group_condition_destroy(&selects->group_conditions[i]);
+  }
+  selects->group_condition_num = 0;
 }
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num, size_t values_group_num)
