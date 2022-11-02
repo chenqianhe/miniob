@@ -37,6 +37,45 @@ void Printer::insert_value_from_tuple(const Tuple &tuple)
   }
 }
 
+void Printer::insert_value_by_column_name(TupleSet &tupleset){
+  for(int i = 0;i < column_names_.size();i++){
+    const char* current_name = column_names_[i].c_str();
+    for(int j = 0;j < tupleset.size();j++) {
+      Tuple *tuple = tupleset.tuples()[j];
+      TupleCell cell;
+      TupleCell null_tag_cell;
+      RC rc = tuple->cell_at(tuple->cell_num() - 1, null_tag_cell);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to fetch field of null tag cell. index=%d, rc=%s", tuple->cell_num() - 1, strrc(rc));
+        return;
+      }
+      std::bitset<sizeof(int) * 8> null_tag_bit = NullTag::convert_null_tag_bitset(null_tag_cell.null_tag_to_int());
+      for (int k = 0; k < tuple->cell_num() - 1; k++) {
+        if(strcmp(current_name,static_cast<ProjectTuple*>(tuple)->find_cell_by_index(k)->alias()) == 0){
+          rc = tuple->cell_at(k, cell);
+          if (rc != RC::SUCCESS) {
+            LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
+            break;
+          }
+          Value value;
+          if (null_tag_bit[k]) {
+            int v = 0;
+            value.type = NULL_;
+            value.data = malloc(sizeof(v));
+            memcpy(value.data, &v, sizeof(v));
+          } else {
+            value.type = cell.attr_type();
+            value.data = malloc(cell.length());
+            memcpy(value.data, cell.data(), cell.length());
+            LOG_INFO("length: %d", cell.length());
+          }
+          insert_value(value);
+        }
+      }
+    }
+  }
+}
+
 void Printer::print_headers(std::ostream &os) {
   for (int i = 0; i < column_names_.size(); i++) {
     if (i != 0) {

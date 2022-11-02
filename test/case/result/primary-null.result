@@ -1,3 +1,4 @@
+
 INITIALIZATION
 CREATE TABLE null_table(id int, num int nullable, price float not null, birthday date nullable);
 SUCCESS

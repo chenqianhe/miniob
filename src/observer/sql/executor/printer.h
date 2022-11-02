@@ -10,6 +10,7 @@
 #include "string"
 #include "sql/parser/parse_defs.h"
 #include "sql/expr/tuple.h"
+#include "sql/expr/TupleSet.h"
 
 class Printer {
 public:
@@ -20,6 +21,7 @@ public:
   void set_column_names(const std::vector<std::string>& names) { column_names_ = names; };
   void expand_rows() { contents_.emplace_back(std::vector<Value>()); }
   void insert_value_from_tuple(const Tuple &tuple);
+  void insert_value_by_column_name(TupleSet &tupleset);
   void insert_value(Value value) { contents_[contents_.size()-1].emplace_back(value); };
   void print_headers(std::ostream &os);
   void print_contents(std::ostream &os);

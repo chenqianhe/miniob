@@ -707,13 +707,16 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   bool order_by = select_stmt->order_condition_num() > 0;
   bool aggr_mode = select_stmt->aggr_attribute_num() > 0;
   RC rc = RC::SUCCESS;
+
   if (select_stmt->tables().size() > 1) {
     //对每个表进行表内条件过滤，得到每个表差寻出来的结果（一个tupleset），存储到tuple_sets
     std::vector<TupleSet*> tuple_sets;
     std::vector<Operator*> scan_opers;
     std::vector<PredicateOperator*> pred_opers;
     std::vector<ProjectOperator*> proj_opers;
+    std::vector<Field> better_field;
     for(int index = select_stmt->tables().size() -1;index >= 0;index--){
+//    for(int index = 0;index < select_stmt->tables().size();index++){
       Table *table = select_stmt->tables()[index];
       Operator *scan_oper = try_to_create_index_scan_operator_with_table(select_stmt->filter_stmt(),table);
       if (nullptr == scan_oper) {
@@ -783,6 +786,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           }
           const char* alias_ = alias;
           spec->set_alias(alias_);
+          LOG_INFO("field is %s",alias);
           ptuple->add_cell_spec(spec);
         }
         tuple_set->add_tuple(ptuple);
@@ -797,52 +801,51 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     }
 
     std::stringstream ss;
+    for (int i = 0;i < select_stmt->query_fields().size() - select_stmt->tables().size();i++) {
+      const Field &field = select_stmt->query_fields()[i];
+      const char* table_name = field.table_name();
+      const char* field_name = field.field_name();
+      int table_name_len = strlen(table_name);
+      int field_name_len = strlen(field_name);
+      char *alias = new char[table_name_len + field_name_len + 1];
+      for(int j = 0;j < table_name_len;j++){
+          alias[j] = table_name[j];
+      }
+      alias[table_name_len] = '.';
+      for(int j = 0;j < field_name_len ;j++){
+          alias[j+table_name_len+1] = field_name[j];
+      }
+
+      printer.insert_column_name(alias);
+    }
+
     if(!is_empty){
       //对得到的tuple_sets求笛卡尔积
       std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets);
       //处理表间查询
       std::vector<FilterUnit*> tables_filter;
-      print_descartes_tuple_header(ss,*descartesSet[0]);
       for(TupleSet *tupleset:descartesSet){
         if(do_predicate(*tupleset,select_stmt->filter_stmt())){
-          print_descartes_tuple(ss,*tupleset);
-          ss<<std::endl;
+          printer.expand_rows();
+          printer.insert_value_by_column_name(*tupleset);
         }
-
       }
+      printer.print_headers(ss);
+      if (order_by) {
+        printer.sort_contents(select_stmt->order_condition_num(), select_stmt->get_order_conditions());
+      }
+      printer.print_contents(ss);
     }else{
-      for(int i = 0;i < select_stmt->query_fields().size() - select_stmt->tables().size();i++){
-        const Field &field = select_stmt->query_fields()[i];
-        const char* table_name = field.table_name();
-        const char* field_name = field.field_name();
-        int table_name_len = strlen(table_name);
-        int field_name_len = strlen(field_name);
-        char *alias = new char[table_name_len + field_name_len + 1];
-        for(int i = 0;i < table_name_len;i++){
-          alias[i] = table_name[i];
-        }
-        alias[table_name_len] = '.';
-        for(int i = 0;i < field_name_len ;i++){
-          alias[i+table_name_len+1] = field_name[i];
-        }
-        ss<<alias;
-        if(i != select_stmt->query_fields().size()- select_stmt->tables().size() - 1){
-          ss<<" | ";
-        }
-      }
-      ss<<std::endl;
-
+      printer.print_headers(ss);
     }
     session_event->set_response(ss.str());
     return rc;
   }
 
-
   Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
   if (nullptr == scan_oper) {
     scan_oper = new TableScanOperator(select_stmt->tables()[0]);
   }
-
   DEFER([&] () {delete scan_oper;});
 
   // count, avg/idx, min, max
