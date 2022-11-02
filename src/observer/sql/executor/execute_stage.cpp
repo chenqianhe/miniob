@@ -1268,5 +1268,4 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
     session_event->set_response("FAILURE\n");
   }
   return rc;
-
 }
