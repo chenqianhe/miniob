@@ -80,7 +80,8 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     }
     if (common::is_blank(relation_attr.relation_name) && 0 == strcmp(relation_attr.attribute_name, "*")) {
       //单表查询，无表名
-      for (Table *table : tables) {
+      for (int i = tables.size() - 1;i >= 0 ;i--) {
+        Table *table = tables[i];
         wildcard_fields(table, query_fields);
       }
 
@@ -95,7 +96,8 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
           LOG_WARN("invalid field name while table is *. attr=%s", field_name);
           return RC::SCHEMA_FIELD_MISSING;
         }
-        for (Table *table : tables) {
+        for (int i = tables.size() - 1;i >= 0 ;i--) {
+          Table *table = tables[i];
           wildcard_fields(table, query_fields);
         }
       } else {
