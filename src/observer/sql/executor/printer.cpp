@@ -31,7 +31,7 @@ void Printer::insert_value_from_tuple(const Tuple &tuple)
       value.type = cell.attr_type();
       value.data = malloc(cell.length());
       memcpy(value.data, cell.data(), cell.length());
-      LOG_INFO("length: %d", cell.length());
+//      LOG_INFO("length: %d", cell.length());
     }
     insert_value(value);
   }
@@ -67,7 +67,7 @@ void Printer::insert_value_by_column_name(TupleSet &tupleset){
             value.type = cell.attr_type();
             value.data = malloc(cell.length());
             memcpy(value.data, cell.data(), cell.length());
-            LOG_INFO("length: %d", cell.length());
+//            LOG_INFO("length: %d", cell.length());
           }
           insert_value(value);
         }
