@@ -715,7 +715,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::vector<PredicateOperator*> pred_opers;
     std::vector<ProjectOperator*> proj_opers;
     std::vector<Field> better_field;
-    for(int index = select_stmt->tables().size() -1;index >= 0;index--){
+    for(int index = select_stmt->tables().size() - 1;index >= 0;index--){
 //    for(int index = 0;index < select_stmt->tables().size();index++){
       Table *table = select_stmt->tables()[index];
       Operator *scan_oper = try_to_create_index_scan_operator_with_table(select_stmt->filter_stmt(),table);
@@ -786,7 +786,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           }
           const char* alias_ = alias;
           spec->set_alias(alias_);
-          LOG_INFO("field is %s",alias);
+          LOG_INFO("field is %s",alias_);
           ptuple->add_cell_spec(spec);
         }
         tuple_set->add_tuple(ptuple);
@@ -815,7 +815,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       for(int j = 0;j < field_name_len ;j++){
           alias[j+table_name_len+1] = field_name[j];
       }
-
+      LOG_INFO("print field is %s",alias);
       printer.insert_column_name(alias);
     }
 
@@ -823,7 +823,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       //对得到的tuple_sets求笛卡尔积
       std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets);
       //处理表间查询
-      std::vector<FilterUnit*> tables_filter;
       for(TupleSet *tupleset:descartesSet){
         if(do_predicate(*tupleset,select_stmt->filter_stmt())){
           printer.expand_rows();
@@ -1268,5 +1267,4 @@ RC ExecuteStage::do_update(SQLStageEvent *sql_event)
     session_event->set_response("FAILURE\n");
   }
   return rc;
-
 }
