@@ -170,10 +170,14 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   for (int i = 0; i < select_sql.order_condition_num; ++i) {
     select_stmt->order_conditions_[i] = select_sql.order_conditions[i];
   }
+  for (int i=0; i < select_sql.group_condition_num; ++i) {
+    select_stmt->group_conditions_[i] = select_sql.group_conditions[i];
+  }
   select_stmt->tables_.swap(tables);
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->order_condition_num_ = select_sql.order_condition_num;
+  select_stmt->group_condition_num_ = select_sql.group_condition_num;
   stmt = select_stmt;
   LOG_INFO("Succ creating select stmt");
   return RC::SUCCESS;

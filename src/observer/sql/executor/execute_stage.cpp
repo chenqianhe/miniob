@@ -704,6 +704,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   Printer printer = Printer();
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
+  bool group_by = select_stmt->group_condition_num() > 0;
   bool order_by = select_stmt->order_condition_num() > 0;
   bool aggr_mode = select_stmt->aggr_attribute_num() > 0;
   RC rc = RC::SUCCESS;
@@ -878,7 +879,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   std::stringstream ss;
-  if (aggr_mode) {
+  if (aggr_mode && !group_by) {
     printer.clear();
     printer.expand_rows();
     while ((rc = project_oper.next()) == RC::SUCCESS) {
@@ -1035,10 +1036,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       printer.insert_value_from_tuple(*tuple);
     }
   }
-  printer.print_headers(ss);
   if (order_by) {
     printer.sort_contents(select_stmt->order_condition_num(), select_stmt->get_order_conditions());
   }
+  if (group_by) {
+    printer.group_contents(select_stmt->group_condition_num(), select_stmt->get_group_conditions(), select_stmt->attributes(), select_stmt->aggr_attribute_num());
+  }
+  printer.print_headers(ss);
   printer.print_contents(ss);
   if (rc != RC::RECORD_EOF) {
     LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
