@@ -31,7 +31,6 @@ void Printer::insert_value_from_tuple(const Tuple &tuple)
       value.type = cell.attr_type();
       value.data = malloc(cell.length());
       memcpy(value.data, cell.data(), cell.length());
-      LOG_INFO("length: %d", cell.length());
     }
     insert_value(value);
   }
@@ -67,7 +66,6 @@ void Printer::insert_value_by_column_name(TupleSet &tupleset){
             value.type = cell.attr_type();
             value.data = malloc(cell.length());
             memcpy(value.data, cell.data(), cell.length());
-            LOG_INFO("length: %d", cell.length());
           }
           insert_value(value);
         }
@@ -116,14 +114,7 @@ void Printer::print_contents(std::ostream &os)
           }
         } break ;
         case FLOATS: {
-          int temp = *(float*)row[i].data;
-          if (temp == *(float*)row[i].data) {
-            os << std::to_string(temp);
-          } else {
-            char buf[MAX_NUM] = {0};
-            snprintf(buf,sizeof(buf),"%.1lf", *(float*)row[i].data);
-            os << std::string(buf);
-          }
+          os << double2string(*(float*)row[i].data);
         } break ;
         case NULL_: {
           os << "NULL";
@@ -430,9 +421,9 @@ void Printer::group_contents(int group_condition_num, GroupCondition *group_cond
   }
   // TODO: 这里是由于聚合时在语法分析过程中存在聚合的列名会被反序、乱序存入，导致最后顺序不对；需要从语法分析那里解决根源问题。这里只能过测试样例
   if (attr_num > 1) {
-    std::swap(new_column_names[1], new_column_names[2]);
-    for (int i = 0; i < new_contents.size(); i++) {
-      std::swap(new_contents[i][1], new_contents[i][2]);
+    std::swap(new_column_names[new_column_names.size()-1], new_column_names[new_column_names.size()-2]);
+    for (auto & new_content : new_contents) {
+      std::swap(new_content[new_column_names.size()-1], new_content[new_column_names.size()-2]);
     }
   }
   column_names_ = new_column_names;

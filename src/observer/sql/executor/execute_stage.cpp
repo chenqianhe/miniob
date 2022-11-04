@@ -831,14 +831,15 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           printer.insert_value_by_column_name(*tupleset);
         }
       }
-      printer.print_headers(ss);
       if (order_by) {
         printer.sort_contents(select_stmt->order_condition_num(), select_stmt->get_order_conditions());
       }
-      printer.print_contents(ss);
-    }else{
-      printer.print_headers(ss);
     }
+    if (group_by) {
+      printer.group_contents(select_stmt->group_condition_num(), select_stmt->get_group_conditions(), select_stmt->attributes(), select_stmt->aggr_attribute_num());
+    }
+    printer.print_headers(ss);
+    printer.print_contents(ss);
     session_event->set_response(ss.str());
     return rc;
   }

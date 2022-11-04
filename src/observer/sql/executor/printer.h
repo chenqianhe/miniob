@@ -11,6 +11,7 @@
 #include "sql/parser/parse_defs.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/TupleSet.h"
+#include "util/util.h"
 
 class Printer {
 public:
