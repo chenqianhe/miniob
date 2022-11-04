@@ -786,15 +786,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       tuple_sets.push_back(tuple_set);
     }
 
-    std::stringstream ss1;
-    for(TupleSet *tupleset : tuple_sets){
-      print_descarte_tuple_header(ss1,static_cast<ProjectTuple&>(*tupleset->tuples()[0]));
-      for(Tuple *tuple : tupleset->tuples()){
-        tuple_to_string(ss1,*tuple);
-        ss1<<std::endl;
-      }
-    }
-    LOG_INFO("result is \n%s",ss1.str().c_str());
 
     bool is_empty = false;
     for(TupleSet *tuple_set:tuple_sets){
@@ -810,31 +801,17 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       alias.append(".");
       alias.append(field.field_name());
       printer.insert_column_name(alias);
-//      LOG_INFO("print field is %s,size is %d",alias.c_str(),alias.length());
     }
 
-//    std::stringstream ss1;
 
     if(!is_empty){
       //对得到的tuple_sets求笛卡尔积
       std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets);
-//      print_descartes_tuple_header(ss1,*descartesSet[0]);
-//      for(TupleSet *tupleset:descartesSet){
-//        if(do_predicate(*tupleset,select_stmt->filter_stmt())){
-//          print_descartes_tuple(ss1,*tupleset);
-//          ss1<<std::endl;
-//          //          LOG_INFO("get one result");
-//        }
-//      }
-//      LOG_INFO("result is \n%s",ss1.str().c_str());
       //处理表间查询
       for(TupleSet *tupleset:descartesSet){
         if(do_predicate(*tupleset,select_stmt->filter_stmt())){
           printer.expand_rows();
           printer.insert_value_by_column_name(*tupleset);
-          print_descartes_tuple(ss1,*tupleset);
-          ss1<<std::endl;
-//          LOG_INFO("get one result");
         }
       }
       printer.print_headers(ss);
