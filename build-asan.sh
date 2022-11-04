@@ -1,1 +1,1 @@
-mkdir -p build && cd build && cmake .. -DENABLE_ASAN=ON -DDEBUG=ON -DCMAKE_C_COMPILER=/opt/rh/devtoolset-11/root/bin/gcc -DCMAKE_CXX_COMPILER=/opt/rh/devtoolset-11/root/bin/g++ && make -j4
+mkdir -p build && cd build && cmake .. -DENABLE_ASAN=ON && make -j4
