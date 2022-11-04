@@ -21,6 +21,7 @@ See the Mulan PSL v2 for more details. */
 #include "rc.h"
 #include "sql/stmt/update_stmt.h"
 #include "storage/trx/trx.h"
+#include <string>
 
 class SQLStageEvent;
 class SessionEvent;
