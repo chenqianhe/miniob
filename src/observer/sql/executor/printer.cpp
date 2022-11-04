@@ -39,11 +39,13 @@ void Printer::insert_value_from_tuple(const Tuple &tuple)
 void Printer::insert_value_by_column_name(TupleSet &tupleset){
   for(int i = 0;i < column_names_.size();i++){
     const char* current_name = column_names_[i].c_str();
+
     for(int j = 0;j < tupleset.size();j++) {
       Tuple *tuple = tupleset.tuples()[j];
       TupleCell cell;
       TupleCell null_tag_cell;
       RC rc = tuple->cell_at(tuple->cell_num() - 1, null_tag_cell);
+
       if (rc != RC::SUCCESS) {
         LOG_WARN("failed to fetch field of null tag cell. index=%d, rc=%s", tuple->cell_num() - 1, strrc(rc));
         return;
