@@ -43,16 +43,20 @@ public:
   RelAttr get_aggr_attribute(int idx) const { return attributes_[idx]; }
   int aggr_attribute_num() { return aggr_attribute_num_; }
   int order_condition_num() { return order_condition_num_; }
-  _OrderCondition *get_order_conditions() { return order_conditions_; }
+  int group_condition_num() { return group_condition_num_; }
+  RelAttr *attributes() { return attributes_; }
+  OrderCondition *get_order_conditions() { return order_conditions_; }
+  GroupCondition *get_group_conditions() { return group_conditions_; }
 
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
   FilterStmt *filter_stmt_ = nullptr;
-  // todo: 此时如果是聚合运算，则所有都是聚合；后续如果支持分组则需要再优化
   RelAttr attributes_[MAX_NUM];
   int aggr_attribute_num_ = 0;
   OrderCondition order_conditions_[MAX_NUM];
   int order_condition_num_ = 0;
+  GroupCondition group_conditions_[MAX_NUM];
+  int group_condition_num_ = 0;
 };
 

@@ -11,6 +11,7 @@
 #include "sql/parser/parse_defs.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/TupleSet.h"
+#include "util/util.h"
 
 class Printer {
 public:
@@ -26,12 +27,16 @@ public:
   void print_headers(std::ostream &os);
   void print_contents(std::ostream &os);
   void sort_contents(int order_condition_num, OrderCondition order_conditions[]);
+  void group_contents(int group_condition_num, GroupCondition group_conditions[], RelAttr attributes[], int attr_num);
 
   void clear() {
     column_names_.clear();
     contents_.clear();
   }
 private:
+  void aggr_contents(Value &value, AggrType aggr_type, int index, std::vector<std::vector<Value>> contents);
+  int cmp_non_null_value(Value &v1, Value &v2);
+
   std::vector<std::string> column_names_;
   std::vector<std::vector<Value>> contents_;
 

@@ -18,9 +18,11 @@ typedef struct ParserContext {
   size_t value_length;
   size_t values_group_num;
   size_t order_condition_num;
+  size_t group_condition_num;
   Value values[MAX_NUM];
   Condition conditions[MAX_NUM];
   OrderCondition order_conditions[MAX_NUM];
+  GroupCondition group_conditions[MAX_NUM];
   CompOp comp;
   char id[MAX_NUM];
 } ParserContext;
@@ -48,6 +50,7 @@ void yyerror(yyscan_t scanner, const char *str)
   context->value_length = 0;
   context->values_group_num=0;
   context->order_condition_num = 0;
+  context->group_condition_num = 0;
   context->ssql->sstr.insertion.value_num = 0;
   printf("parse sql failed. error=%s", str);
 }
@@ -117,6 +120,7 @@ ParserContext *get_context(yyscan_t scanner)
         NOT
         NULL_ABLE
         ORDER
+        GROUP
         BY
         ASC
 
@@ -411,7 +415,7 @@ update:			/*  update 语句的语法解析树*/
 		}
     ;
 select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where order_by_list SEMICOLON
+    SELECT select_attr FROM ID rel_list where order_by_list group_by_list SEMICOLON
 		{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
@@ -419,6 +423,8 @@ select:				/*  select 语句的语法解析树*/
 			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
 
 			selects_append_order_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->order_conditions, CONTEXT->order_condition_num);
+
+			selects_append_group_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->group_conditions, CONTEXT->group_condition_num);
 
 			CONTEXT->ssql->flag=SCF_SELECT;//"select";
 			// CONTEXT->ssql->sstr.selection.attr_num = CONTEXT->select_length;
@@ -429,6 +435,7 @@ select:				/*  select 语句的语法解析树*/
 			CONTEXT->select_length=0;
 			CONTEXT->value_length = 0;
 			CONTEXT->order_condition_num = 0;
+			CONTEXT->group_condition_num = 0;
 	}
 	;
 
@@ -563,6 +570,28 @@ asc:
 	|ASC {}
 	;
 
+group_by_list:
+	/* empty */
+	|GROUP BY group_by_attr {}
+	;
+
+group_by_attr:
+	group_by {}
+	|group_by COMMA group_by_attr {}
+	;
+
+group_by:
+	ID {
+		GroupCondition group_condition;
+		group_condition_init(&group_condition, NULL, $1);
+		CONTEXT->group_conditions[CONTEXT->group_condition_num++] = group_condition;
+	}
+    |ID DOT ID {
+		GroupCondition group_condition;
+		group_condition_init(&group_condition, $1, $3);
+		CONTEXT->group_conditions[CONTEXT->group_condition_num++] = group_condition;
+	}
+  	;
 where:
     /* empty */ 
     | WHERE condition condition_list {	
