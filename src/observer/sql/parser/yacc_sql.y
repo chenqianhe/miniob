@@ -123,6 +123,8 @@ ParserContext *get_context(yyscan_t scanner)
         GROUP
         BY
         ASC
+        INNER
+        JOIN
 
 
 %union {
@@ -415,7 +417,7 @@ update:			/*  update 语句的语法解析树*/
 		}
     ;
 select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where order_by_list group_by_list SEMICOLON
+    SELECT select_attr FROM ID rel_list inner_join where order_by_list group_by_list SEMICOLON
 		{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
@@ -436,6 +438,13 @@ select:				/*  select 语句的语法解析树*/
 			CONTEXT->value_length = 0;
 			CONTEXT->order_condition_num = 0;
 			CONTEXT->group_condition_num = 0;
+	}
+	;
+
+inner_join:
+	/* empty */
+	|INNER JOIN ID ON condition condition_list inner_join {
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $3);
 	}
 	;
 
