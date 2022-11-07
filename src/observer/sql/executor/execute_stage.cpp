@@ -492,6 +492,8 @@ IndexScanOperator *try_to_create_index_scan_operator_with_table(FilterStmt *filt
     if (left->type() == ExprType::FIELD && right->type() == ExprType::VALUE) {
     } else if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
       std::swap(left, right);
+    }else if (left->type() == ExprType::VALUE && right->type() == ExprType::VALUE) {
+      continue;
     }
     FieldExpr &left_field_expr = *(FieldExpr *)left;
     const Field &field = left_field_expr.field();
@@ -716,10 +718,16 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::vector<PredicateOperator*> pred_opers;
     std::vector<ProjectOperator*> proj_opers;
     std::vector<std::string *> alias_set;
+
     for(int index = select_stmt->tables().size() - 1;index >= 0;index--){
+
 //    for(int index = 0;index < select_stmt->tables().size();index++){
+
       Table *table = select_stmt->tables()[index];
+      LOG_INFO("current tuple name is %s",table->name());
+      LOG_INFO("try to get scan_oper");
       Operator *scan_oper = try_to_create_index_scan_operator_with_table(select_stmt->filter_stmt(),table);
+
       if (nullptr == scan_oper) {
         scan_oper = new TableScanOperator(table);
       }
@@ -779,7 +787,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
           alias->append(field.field_name());
           spec->set_alias(alias->c_str());
           alias_set.push_back(alias);
-//          LOG_INFO("field is %s,size is %d",alias.c_str(),alias.length());
+          LOG_INFO("field is %s,size is %d",alias->c_str(),alias->length());
           ptuple->add_cell_spec(spec);
         }
         tuple_set->add_tuple(ptuple);
@@ -807,13 +815,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
     if(!is_empty){
       //对得到的tuple_sets求笛卡尔积
-      std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets);
+      LOG_INFO("try to get descartesSet");
+      std::vector<TupleSet*> descartesSet = getDescartes(tuple_sets,select_stmt->filter_stmt());
+      LOG_INFO("get descartesSet,size is %d",descartesSet.size());
       //处理表间查询
       for(TupleSet *tupleset:descartesSet){
-        if(do_predicate(*tupleset,select_stmt->filter_stmt())){
-          printer.expand_rows();
-          printer.insert_value_by_column_name(*tupleset);
-        }
+        printer.expand_rows();
+        printer.insert_value_by_column_name(*tupleset);
       }
       if (order_by) {
         printer.sort_contents(select_stmt->order_condition_num(), select_stmt->get_order_conditions());
